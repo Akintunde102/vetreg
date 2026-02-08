@@ -1,0 +1,181 @@
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateClientDto } from './dto/create-client.dto';
+import { UpdateClientDto } from './dto/update-client.dto';
+import { DeleteClientDto } from './dto/delete-client.dto';
+import { AuditLogService } from '../common/services/audit-log.service';
+import { ActivityLogService } from '../common/services/activity-log.service';
+export declare class ClientsService {
+    private prisma;
+    private auditLogService;
+    private activityLogService;
+    constructor(prisma: PrismaService, auditLogService: AuditLogService, activityLogService: ActivityLogService);
+    create(organizationId: string, vetId: string, dto: CreateClientDto): Promise<{
+        id: string;
+        email: string | null;
+        phoneNumber: string;
+        city: string | null;
+        state: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string;
+        address: string | null;
+        isActive: boolean;
+        createdBy: string;
+        firstName: string;
+        lastName: string;
+        alternatePhone: string | null;
+        notes: string | null;
+        isDeleted: boolean;
+        deletedAt: Date | null;
+        deletionReason: string | null;
+        deletedBy: string | null;
+    }>;
+    findAll(organizationId: string, page?: number, limit?: number, search?: string, includeDeleted?: boolean): Promise<{
+        clients: ({
+            _count: {
+                animals: number;
+            };
+        } & {
+            id: string;
+            email: string | null;
+            phoneNumber: string;
+            city: string | null;
+            state: string | null;
+            createdAt: Date;
+            updatedAt: Date;
+            organizationId: string;
+            address: string | null;
+            isActive: boolean;
+            createdBy: string;
+            firstName: string;
+            lastName: string;
+            alternatePhone: string | null;
+            notes: string | null;
+            isDeleted: boolean;
+            deletedAt: Date | null;
+            deletionReason: string | null;
+            deletedBy: string | null;
+        })[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+    }>;
+    findOne(organizationId: string, clientId: string): Promise<{
+        creator: {
+            id: string;
+            email: string;
+            fullName: string | null;
+        };
+        animals: {
+            name: string;
+            id: string;
+            species: import("@prisma/client").$Enums.AnimalSpecies;
+            breed: string | null;
+            isAlive: boolean;
+        }[];
+        deleter: {
+            id: string;
+            email: string;
+            fullName: string | null;
+        } | null;
+    } & {
+        id: string;
+        email: string | null;
+        phoneNumber: string;
+        city: string | null;
+        state: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string;
+        address: string | null;
+        isActive: boolean;
+        createdBy: string;
+        firstName: string;
+        lastName: string;
+        alternatePhone: string | null;
+        notes: string | null;
+        isDeleted: boolean;
+        deletedAt: Date | null;
+        deletionReason: string | null;
+        deletedBy: string | null;
+    }>;
+    update(organizationId: string, clientId: string, vetId: string, dto: UpdateClientDto): Promise<{
+        id: string;
+        email: string | null;
+        phoneNumber: string;
+        city: string | null;
+        state: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string;
+        address: string | null;
+        isActive: boolean;
+        createdBy: string;
+        firstName: string;
+        lastName: string;
+        alternatePhone: string | null;
+        notes: string | null;
+        isDeleted: boolean;
+        deletedAt: Date | null;
+        deletionReason: string | null;
+        deletedBy: string | null;
+    }>;
+    softDelete(organizationId: string, clientId: string, vetId: string, dto: DeleteClientDto): Promise<{
+        message: string;
+        deletedClient: string;
+        cascadedAnimals: number;
+    }>;
+    restore(organizationId: string, clientId: string, vetId: string): Promise<{
+        id: string;
+        email: string | null;
+        phoneNumber: string;
+        city: string | null;
+        state: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string;
+        address: string | null;
+        isActive: boolean;
+        createdBy: string;
+        firstName: string;
+        lastName: string;
+        alternatePhone: string | null;
+        notes: string | null;
+        isDeleted: boolean;
+        deletedAt: Date | null;
+        deletionReason: string | null;
+        deletedBy: string | null;
+    }>;
+    getClientAnimals(organizationId: string, clientId: string): Promise<{
+        name: string;
+        id: string;
+        dateOfBirth: Date | null;
+        gender: import("@prisma/client").$Enums.AnimalGender;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string;
+        isActive: boolean;
+        createdBy: string;
+        notes: string | null;
+        isDeleted: boolean;
+        deletedAt: Date | null;
+        deletionReason: string | null;
+        deletedBy: string | null;
+        clientId: string;
+        species: import("@prisma/client").$Enums.AnimalSpecies;
+        breed: string | null;
+        color: string | null;
+        approximateAge: string | null;
+        weight: import("@prisma/client-runtime-utils").Decimal | null;
+        weightUnit: import("@prisma/client").$Enums.WeightUnit | null;
+        microchipNumber: string | null;
+        identifyingMarks: string | null;
+        photoUrl: string | null;
+        isAlive: boolean;
+        dateOfDeath: Date | null;
+        causeOfDeath: string | null;
+    }[]>;
+}

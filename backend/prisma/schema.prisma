@@ -1,0 +1,487 @@
+// Veterinary Registration & Practice Management Platform
+// Database Schema - PRD v1.1.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum VetStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum OrgType {
+  CLINIC
+  HOSPITAL
+  MOBILE_PRACTICE
+  RESEARCH_LAB
+  OTHER
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  REMOVED
+  LEFT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum AnimalSpecies {
+  DOG
+  CAT
+  HORSE
+  CATTLE
+  GOAT
+  SHEEP
+  PIG
+  POULTRY
+  RABBIT
+  FISH
+  BIRD
+  REPTILE
+  OTHER
+}
+
+enum AnimalGender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum WeightUnit {
+  KG
+  LBS
+}
+
+enum TemperatureUnit {
+  CELSIUS
+  FAHRENHEIT
+}
+
+enum TreatmentStatus {
+  COMPLETED
+  IN_PROGRESS
+  FOLLOW_UP_REQUIRED
+  REFERRED
+}
+
+enum NotificationType {
+  VET_PROFILE_SUBMITTED
+  VET_APPROVED
+  VET_REJECTED
+  VET_SUSPENDED
+  VET_REACTIVATED
+  INVITATION_SENT
+  INVITATION_ACCEPTED
+  INVITATION_DECLINED
+  MEMBER_REMOVED
+  MEMBER_ROLE_CHANGED
+  MEMBER_PERMISSIONS_UPDATED
+  FOLLOW_UP_REMINDER
+  CLIENT_DELETED
+  ANIMAL_DELETED
+  TREATMENT_DELETED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  BOTH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  NOT_APPLICABLE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum PracticeType {
+  SMALL_ANIMAL
+  LARGE_ANIMAL
+  MIXED
+  EXOTIC
+  EQUINE
+  AVIAN
+  OTHER
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model Vet {
+  id                  String    @id @default(uuid())
+  authUserId          String    @unique @map("auth_user_id")
+  email               String    @unique
+  fullName            String?   @map("full_name")
+  phoneNumber         String?   @map("phone_number")
+  dateOfBirth         DateTime? @map("date_of_birth") @db.Date
+  gender              Gender?
+  profilePhotoUrl     String?   @map("profile_photo_url")
+
+  // Professional
+  vcnNumber           String?   @unique @map("vcn_number")
+  specialization      String?
+  yearsOfExperience   Int?      @map("years_of_experience")
+  qualifications      String[]  @default([])
+  universityAttended  String?   @map("university_attended")
+  graduationYear      Int?      @map("graduation_year")
+
+  // Practice
+  practiceAddress     String?   @map("practice_address")
+  city                String?
+  state               String?
+  country             String?   @default("NG")
+  practiceType        PracticeType? @map("practice_type")
+
+  // Status
+  status              VetStatus @default(PENDING_APPROVAL)
+  profileCompleted    Boolean   @default(false) @map("profile_completed")
+  profileSubmittedAt  DateTime? @map("profile_submitted_at")
+  approvedAt          DateTime? @map("approved_at")
+  approvedBy          String?   @map("approved_by")
+  rejectedAt          DateTime? @map("rejected_at")
+  rejectedBy          String?   @map("rejected_by")
+  rejectionReason     String?   @map("rejection_reason")
+  suspendedAt         DateTime? @map("suspended_at")
+  suspendedBy         String?   @map("suspended_by")
+  suspensionReason    String?   @map("suspension_reason")
+  reactivatedAt       DateTime? @map("reactivated_at")
+  reactivatedBy       String?   @map("reactivated_by")
+
+  // Platform
+  isMasterAdmin       Boolean   @default(false) @map("is_master_admin")
+
+  // Metadata
+  googleDisplayName   String?   @map("google_display_name")
+  googleAvatarUrl     String?   @map("google_avatar_url")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  memberships         OrgMembership[]
+  createdOrgs         Organization[]  @relation("OrgCreator")
+  treatments          TreatmentRecord[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  activityLogs        ActivityLog[]
+  createdClients      Client[]        @relation("ClientCreator")
+  createdAnimals      Animal[]        @relation("AnimalCreator")
+  sentInvitations     Invitation[]    @relation("InvitationSender")
+  deletedClients      Client[]        @relation("ClientDeleter")
+  deletedAnimals      Animal[]        @relation("AnimalDeleter")
+  deletedTreatments   TreatmentRecord[] @relation("TreatmentDeleter")
+
+  @@index([status])
+  @@map("vets")
+}
+
+model Organization {
+  id            String   @id @default(uuid())
+  name          String
+  slug          String   @unique
+  description   String?  @db.Text
+  address       String
+  city          String
+  state         String
+  country       String   @default("NG")
+  phoneNumber   String   @map("phone_number")
+  email         String?
+  website       String?
+  logoUrl       String?  @map("logo_url")
+  type          OrgType  @default(CLINIC)
+  isActive      Boolean  @default(true) @map("is_active")
+
+  createdBy     String   @map("created_by")
+  creator       Vet      @relation("OrgCreator", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  memberships   OrgMembership[]
+  clients       Client[]
+  animals       Animal[]
+  treatments    TreatmentRecord[]
+  invitations   Invitation[]
+  activityLogs  ActivityLog[]
+
+  @@map("organizations")
+}
+
+model OrgMembership {
+  id              String           @id @default(uuid())
+  vetId           String           @map("vet_id")
+  organizationId  String           @map("organization_id")
+  role            MembershipRole   @default(MEMBER)
+  status          MembershipStatus @default(ACTIVE)
+  joinedAt        DateTime         @default(now()) @map("joined_at")
+  removedAt       DateTime?        @map("removed_at")
+  removedBy       String?          @map("removed_by")
+
+  // Granular permissions (must be explicitly granted, except for OWNER)
+  canDeleteClients    Boolean      @default(false) @map("can_delete_clients")
+  canDeleteAnimals    Boolean      @default(false) @map("can_delete_animals")
+  canDeleteTreatments Boolean      @default(false) @map("can_delete_treatments")
+  canViewActivityLog  Boolean      @default(false) @map("can_view_activity_log")
+
+  vet             Vet              @relation(fields: [vetId], references: [id])
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+
+  @@unique([vetId, organizationId])
+  @@index([organizationId, status])
+  @@map("org_memberships")
+}
+
+model Invitation {
+  id              String           @id @default(uuid())
+  organizationId  String           @map("organization_id")
+  invitedEmail    String           @map("invited_email")
+  role            MembershipRole   @default(MEMBER)
+  token           String           @unique @default(uuid())
+  status          InvitationStatus @default(PENDING)
+  invitedBy       String           @map("invited_by")
+  expiresAt       DateTime         @map("expires_at")
+  respondedAt     DateTime?        @map("responded_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  inviter         Vet              @relation("InvitationSender", fields: [invitedBy], references: [id])
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@unique([organizationId, invitedEmail, status])
+  @@index([token])
+  @@map("invitations")
+}
+
+model Client {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  email           String?
+  phoneNumber     String    @map("phone_number")
+  alternatePhone  String?   @map("alternate_phone")
+  address         String?
+  city            String?
+  state           String?
+  notes           String?   @db.Text
+  isActive        Boolean   @default(true) @map("is_active")
+
+  // Soft delete
+  isDeleted       Boolean   @default(false) @map("is_deleted")
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       String?   @map("deleted_by")
+  deletionReason  String?   @map("deletion_reason") @db.Text
+
+  createdBy       String    @map("created_by")
+  creator         Vet       @relation("ClientCreator", fields: [createdBy], references: [id])
+  deleter         Vet?      @relation("ClientDeleter", fields: [deletedBy], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  animals         Animal[]
+
+  @@index([organizationId])
+  @@index([organizationId, isDeleted])
+  @@index([organizationId, firstName, lastName])
+  @@map("clients")
+}
+
+model Animal {
+  id               String        @id @default(uuid())
+  organizationId   String        @map("organization_id")
+  clientId         String        @map("client_id")
+  name             String
+  species          AnimalSpecies
+  breed            String?
+  color            String?
+  gender           AnimalGender  @default(UNKNOWN)
+  dateOfBirth      DateTime?     @map("date_of_birth") @db.Date
+  approximateAge   String?       @map("approximate_age")
+  weight           Decimal?      @db.Decimal(10, 2)
+  weightUnit       WeightUnit?   @map("weight_unit")
+  microchipNumber  String?       @map("microchip_number")
+  identifyingMarks String?       @map("identifying_marks") @db.Text
+  photoUrl         String?       @map("photo_url")
+  isAlive          Boolean       @default(true) @map("is_alive")
+  isActive         Boolean       @default(true) @map("is_active")
+  dateOfDeath      DateTime?     @map("date_of_death") @db.Date
+  causeOfDeath     String?       @map("cause_of_death") @db.Text
+  notes            String?       @db.Text
+
+  // Soft delete
+  isDeleted        Boolean       @default(false) @map("is_deleted")
+  deletedAt        DateTime?     @map("deleted_at")
+  deletedBy        String?       @map("deleted_by")
+  deletionReason   String?       @map("deletion_reason") @db.Text
+
+  createdBy        String        @map("created_by")
+  creator          Vet           @relation("AnimalCreator", fields: [createdBy], references: [id])
+  deleter          Vet?          @relation("AnimalDeleter", fields: [deletedBy], references: [id])
+  client           Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  organization     Organization  @relation(fields: [organizationId], references: [id])
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  treatments       TreatmentRecord[]
+
+  @@unique([organizationId, microchipNumber])
+  @@index([organizationId])
+  @@index([organizationId, isDeleted])
+  @@index([clientId])
+  @@map("animals")
+}
+
+model TreatmentRecord {
+  id                    String          @id @default(uuid())
+  organizationId        String          @map("organization_id")
+  animalId              String          @map("animal_id")
+  vetId                 String          @map("vet_id")
+  version               Int             @default(1)
+  parentRecordId        String?         @map("parent_record_id")
+  isLatestVersion       Boolean         @default(true) @map("is_latest_version")
+
+  // Clinical
+  visitDate             DateTime        @map("visit_date")
+  chiefComplaint        String          @map("chief_complaint") @db.Text
+  history               String?         @db.Text
+  clinicalFindings      String?         @map("clinical_findings") @db.Text
+  diagnosis             String?         @db.Text
+  differentialDiagnosis String?         @map("differential_diagnosis") @db.Text
+  treatmentGiven        String          @map("treatment_given") @db.Text
+  prescriptions         Json?
+  procedures            String?         @db.Text
+  labResults            String?         @map("lab_results") @db.Text
+  followUpDate          DateTime?       @map("follow_up_date") @db.Date
+  followUpNotes         String?         @map("follow_up_notes") @db.Text
+  weight                Decimal?        @db.Decimal(10, 2)
+  weightUnit            WeightUnit?     @map("weight_unit")
+  temperature           Decimal?        @db.Decimal(5, 2)
+  temperatureUnit       TemperatureUnit? @map("temperature_unit")
+  heartRate             Int?            @map("heart_rate")
+  respiratoryRate       Int?            @map("respiratory_rate")
+  bodyConditionScore    Int?            @map("body_condition_score")
+  attachments           Json?
+  notes                 String?         @db.Text
+  status                TreatmentStatus @default(COMPLETED)
+
+  // Soft delete
+  isDeleted             Boolean         @default(false) @map("is_deleted")
+  deletedAt             DateTime?       @map("deleted_at")
+  deletedBy             String?         @map("deleted_by")
+  deletionReason        String?         @map("deletion_reason") @db.Text
+
+  // Metadata
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  animal                Animal          @relation(fields: [animalId], references: [id])
+  vet                   Vet             @relation(fields: [vetId], references: [id])
+  deleter               Vet?            @relation("TreatmentDeleter", fields: [deletedBy], references: [id])
+  organization          Organization    @relation(fields: [organizationId], references: [id])
+  parentRecord          TreatmentRecord? @relation("TreatmentVersions", fields: [parentRecordId], references: [id])
+  childVersions         TreatmentRecord[] @relation("TreatmentVersions")
+
+  @@index([organizationId])
+  @@index([organizationId, isDeleted])
+  @@index([animalId, isLatestVersion])
+  @@index([parentRecordId])
+  @@index([vetId])
+  @@map("treatment_records")
+}
+
+model Notification {
+  id              String              @id @default(uuid())
+  recipientVetId  String              @map("recipient_vet_id")
+  type            NotificationType
+  title           String
+  body            String              @db.Text
+  channel         NotificationChannel
+  emailStatus     DeliveryStatus      @default(PENDING) @map("email_status")
+  smsStatus       DeliveryStatus      @default(PENDING) @map("sms_status")
+  emailSentAt     DateTime?           @map("email_sent_at")
+  smsSentAt       DateTime?           @map("sms_sent_at")
+  retryCount      Int                 @default(0) @map("retry_count")
+  metadata        Json?
+  isRead          Boolean             @default(false) @map("is_read")
+
+  recipientVet    Vet                 @relation(fields: [recipientVetId], references: [id])
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@index([recipientVetId, isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  vetId       String?  @map("vet_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+
+  vet         Vet?     @relation(fields: [vetId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([vetId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model ActivityLog {
+  id              String       @id @default(uuid())
+  organizationId  String       @map("organization_id")
+  vetId           String       @map("vet_id")
+  action          String
+  entityType      String       @map("entity_type")
+  entityId        String?      @map("entity_id")
+  description     String       @db.Text
+  metadata        Json?
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  vet             Vet          @relation(fields: [vetId], references: [id])
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, action])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, vetId])
+  @@map("activity_logs")
+}
