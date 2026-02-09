@@ -59,11 +59,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       },
     };
 
-    // Log error for monitoring
-    this.logger.error(
-      `[${request.method}] ${request.url} - ${status} ${code}: ${message}`,
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    // Log: 4xx as warn (expected client/validation errors), 5xx as error
+    const logLine = `[${request.method}] ${request.url} - ${status} ${code}: ${message}`;
+    if (status >= 500) {
+      this.logger.error(
+        logLine,
+        exception instanceof Error ? exception.stack : undefined,
+      );
+    } else {
+      this.logger.warn(logLine);
+    }
 
     response.status(status).json(errorResponse);
   }
