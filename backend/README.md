@@ -53,10 +53,10 @@ backend/
 - [x] CORS configuration
 - [x] Rate limiting (ThrottleGuard)
 
-### ✅ Database Schema (Complete - v1.1)
+### ✅ Database Schema (Complete - v1.2)
 - [x] Complete Prisma schema with all models:
   - Vets (with approval workflow)
-  - Organizations (with approval workflow ✨ v1.1)
+  - Organizations (with approval workflow + paymentTerms ✨ v1.2)
   - OrgMemberships (with granular permissions)
   - Invitations
   - Clients (with soft delete)
@@ -537,6 +537,65 @@ The JWT is validated against the Supabase JWT secret and the user's vet record i
 5. **RoleGuard** (route-specific) - Role-based access (use with @Roles)
 6. **DeletePermissionGuard** (route-specific) - Delete permission check
 7. **ActivityLogPermissionGuard** (route-specific) - Activity log access
+
+## P0 Features (v1.2 - February 2026)
+
+### New Endpoints
+
+#### 1. Dashboard Statistics
+**GET** `/orgs/:orgId/dashboard/stats`
+
+Aggregated statistics for dashboard in a single API call.
+
+**Response:**
+```json
+{
+  "clients": { "total": 45, "active": 42, "inactive": 3 },
+  "animals": {
+    "total": 87,
+    "byPatientType": { "SINGLE_PET": 65, "SINGLE_LIVESTOCK": 15, "BATCH_LIVESTOCK": 7 },
+    "bySpecies": { "DOG": 40, "CAT": 25, "CATTLE": 15, "GOAT": 7 },
+    "vaccinationDue": 0
+  },
+  "treatments": { "total": 234, "thisMonth": 18, "scheduled": 5, "followUpsDue": 3 },
+  "revenue": { "total": 450000, "totalPaid": 380000, "totalOwed": 70000, "totalWaived": 0, "unpaidInvoices": 12 }
+}
+```
+
+#### 2. Scheduled Treatments for Today
+**GET** `/orgs/:orgId/treatments/scheduled/today`
+
+Returns all treatments scheduled for the current day.
+
+#### 3. Follow-ups Due Today
+**GET** `/orgs/:orgId/treatments/follow-ups/today`
+
+Returns all treatments with follow-ups due today.
+
+### Enhanced Endpoints
+
+#### 4. Revenue with Date Range
+**GET** `/orgs/:orgId/revenue?fromDate=2024-01-01&toDate=2024-12-31`
+
+Filter revenue by custom date range.
+
+#### 5. Treatments with Payment Category
+**GET** `/orgs/:orgId/treatments?paymentCategory=PET&paymentStatus=OWED`
+
+Filter treatments by patient type (PET, LIVESTOCK, FARM) and payment status.
+
+### Schema Changes
+
+- Added `paymentTerms` field to Organization model
+- Migration SQL: `ALTER TABLE organizations ADD COLUMN payment_terms VARCHAR(255);`
+
+### Documentation
+
+- **Error Codes**: See `docs/backend/ERROR_CODE_CATALOG.md`
+- **Implementation Details**: See `docs/backend/P0_IMPLEMENTATION_SUMMARY.md`
+- **E2E Tests**: See `test/p0-features.e2e-spec.ts`
+
+---
 
 ## Testing the API
 
