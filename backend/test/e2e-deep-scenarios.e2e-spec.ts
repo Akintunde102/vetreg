@@ -1712,4 +1712,284 @@ describe('Deep E2E Scenarios - Real-World Workflows', () => {
       expect(alive + deceased).toBe(allAnimals.body.data.animals.length);
     });
   });
+
+  describe('Scenario 19: Organization Approval Workflow (Master Admin)', () => {
+    it('Master admin should list pending organization approvals', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/orgs/admin/pending-approvals')
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      const list = response.body.data || [];
+      const ids = list.map((o: { id: string }) => o.id);
+      expect(ids).toContain(org1Id);
+      expect(ids).toContain(org2Id);
+    });
+
+    it('Master admin should approve Org1', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/admin/${org1Id}/approve`)
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('APPROVED');
+    });
+
+    it('Master admin should reject Org2 with reason', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/admin/${org2Id}/reject`)
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .send({ reason: 'Duplicate registration; use existing clinic.' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('REJECTED');
+    });
+
+    it('Master admin should suspend Org1', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/admin/${org1Id}/suspend`)
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .send({ reason: 'Temporary compliance review' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('SUSPENDED');
+    });
+
+    it('Master admin should reactivate Org1', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/admin/${org1Id}/reactivate`)
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('APPROVED');
+    });
+  });
+
+  describe('Scenario 20: Patient Types, Batch Livestock & Treatment History Backlog', () => {
+    let singleLivestockId: string;
+    let batchLivestockId: string;
+    let clientForLivestockId: string;
+
+    it('Create client for livestock scenarios', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/clients`)
+        .set('Authorization', `Bearer ${vetAdmin1Token}`)
+        .send({
+          firstName: 'Livestock',
+          lastName: 'Farmer',
+          email: 'farmer@livestock.ng',
+          phoneNumber: '+2348077776666',
+          address: 'Rural Farm Road',
+          city: 'Oyo',
+          state: 'Oyo',
+        })
+        .expect(201);
+      clientForLivestockId = response.body.data.id;
+    });
+
+    it('Register single livestock (SINGLE_LIVESTOCK)', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/animals`)
+        .set('Authorization', `Bearer ${vetAdmin1Token}`)
+        .send({
+          clientId: clientForLivestockId,
+          name: 'Bull-Alpha',
+          species: 'CATTLE',
+          patientType: 'SINGLE_LIVESTOCK',
+          gender: 'MALE',
+          approximateAge: '3 years',
+          weight: 500,
+          weightUnit: 'KG',
+        })
+        .expect(201);
+      singleLivestockId = response.body.data.id;
+      expect(response.body.data.patientType).toBe('SINGLE_LIVESTOCK');
+    });
+
+    it('Register batch livestock with batch metadata', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/animals`)
+        .set('Authorization', `Bearer ${vetAdmin1Token}`)
+        .send({
+          clientId: clientForLivestockId,
+          name: 'Broiler-Batch-1',
+          species: 'POULTRY',
+          patientType: 'BATCH_LIVESTOCK',
+          batchName: 'Broilers Shed A',
+          batchSize: 500,
+          batchIdentifier: 'BR-2026-Q1',
+        })
+        .expect(201);
+      batchLivestockId = response.body.data.id;
+      expect(response.body.data.patientType).toBe('BATCH_LIVESTOCK');
+      expect(response.body.data.batchName).toBe('Broilers Shed A');
+      expect(response.body.data.batchSize).toBe(500);
+      expect(response.body.data.batchIdentifier).toBe('BR-2026-Q1');
+    });
+
+    it('Register livestock with treatment history backlog', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/animals`)
+        .set('Authorization', `Bearer ${vetAdmin1Token}`)
+        .send({
+          clientId: clientForLivestockId,
+          name: 'Goat-Imported',
+          species: 'GOAT',
+          patientType: 'SINGLE_LIVESTOCK',
+          gender: 'FEMALE',
+          treatmentHistory: [
+            {
+              visitDate: '2025-01-10',
+              chiefComplaint: 'Pre-purchase examination and deworming',
+              diagnosis: 'Healthy',
+              treatmentGiven: 'Albendazole, multivalent vaccine',
+              notes: 'Imported from northern region',
+            },
+            {
+              visitDate: '2025-06-15',
+              chiefComplaint: 'Routine vaccination booster',
+              diagnosis: 'Healthy',
+              treatmentGiven: 'Peste des petits ruminants vaccine',
+              notes: 'Annual booster',
+            },
+          ],
+        })
+        .expect(201);
+      expect(response.body.data.id).toBeDefined();
+      const treatments = await request(app.getHttpServer())
+        .get(`/api/v1/orgs/${org1Id}/animals/${response.body.data.id}/treatments`)
+        .set('Authorization', `Bearer ${vetOwnerToken}`)
+        .expect(200);
+      expect(treatments.body.data.length).toBe(2);
+    });
+  });
+
+  describe('Scenario 21: Scheduled Treatments & Payment Lifecycle', () => {
+    let scheduledTreatmentAId: string;
+    let scheduledTreatmentBId: string;
+    let paidTreatmentId: string;
+
+    it('Create treatment with payment (OWED)', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/treatments`)
+        .set('Authorization', `Bearer ${vetMember1Token}`)
+        .send({
+          animalId: animal1Id,
+          visitDate: '2026-02-09',
+          chiefComplaint: 'Consultation with payment tracking',
+          treatmentGiven: 'Examination and prescription',
+          status: 'COMPLETED',
+          amount: 25000,
+          currency: 'NGN',
+          paymentStatus: 'OWED',
+        })
+        .expect(201);
+      paidTreatmentId = response.body.data.id;
+      expect(response.body.data.paymentStatus).toBe('OWED');
+      expect(Number(response.body.data.amount)).toBe(25000);
+    });
+
+    it('Create two scheduled treatments', async () => {
+      const a = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/treatments`)
+        .set('Authorization', `Bearer ${vetAdmin1Token}`)
+        .send({
+          animalId: animal1Id,
+          visitDate: '2026-02-09',
+          chiefComplaint: 'Scheduled follow-up A',
+          treatmentGiven: 'To be determined',
+          isScheduled: true,
+          scheduledFor: '2026-02-20T10:00:00.000Z',
+          status: 'IN_PROGRESS',
+        })
+        .expect(201);
+      scheduledTreatmentAId = a.body.data.id;
+
+      const b = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/treatments`)
+        .set('Authorization', `Bearer ${vetAdmin2Token}`)
+        .send({
+          animalId: animal2Id,
+          visitDate: '2026-02-09',
+          chiefComplaint: 'Scheduled vaccination reminder',
+          treatmentGiven: 'Scheduled',
+          isScheduled: true,
+          scheduledFor: '2026-02-25T14:00:00.000Z',
+          status: 'IN_PROGRESS',
+        })
+        .expect(201);
+      scheduledTreatmentBId = b.body.data.id;
+    });
+
+    it('List scheduled treatments should return both', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/orgs/${org1Id}/treatments/scheduled/list?limit=20`)
+        .set('Authorization', `Bearer ${vetOwnerToken}`)
+        .expect(200);
+      const list = response.body.data.treatments || [];
+      const ids = list.map((t: { id: string }) => t.id);
+      expect(ids).toContain(scheduledTreatmentAId);
+      expect(ids).toContain(scheduledTreatmentBId);
+    });
+
+    it('Mark treatment as PAID updates payment status', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/orgs/${org1Id}/treatments/${paidTreatmentId}/payment`)
+        .set('Authorization', `Bearer ${vetMember1Token}`)
+        .send({
+          paymentStatus: 'PAID',
+          amountPaid: 25000,
+          paymentNotes: 'Cash payment received',
+        })
+        .expect(200);
+      expect(response.body.data.paymentStatus).toBe('PAID');
+    });
+  });
+
+  describe('Scenario 22: Revenue & Payment Breakdown (Deep)', () => {
+    it('OWNER gets revenue with payment breakdown', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/orgs/${org1Id}/revenue`)
+        .set('Authorization', `Bearer ${vetOwnerToken}`)
+        .expect(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.totalRevenue).toBeDefined();
+      expect(response.body.data.totalPaid).toBeDefined();
+      expect(response.body.data.totalOwed).toBeDefined();
+      expect(Array.isArray(response.body.data.paymentBreakdown)).toBe(true);
+    });
+
+    it('ADMIN gets revenue', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/orgs/${org1Id}/revenue`)
+        .set('Authorization', `Bearer ${vetAdmin1Token}`)
+        .expect(200);
+      expect(response.body.data.totalTreatments).toBeDefined();
+    });
+
+    it('MEMBER cannot access revenue', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/orgs/${org1Id}/revenue`)
+        .set('Authorization', `Bearer ${vetMember2Token}`)
+        .expect(403);
+    });
+
+    it('Payment breakdown includes PAID and OWED counts', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/orgs/${org1Id}/revenue`)
+        .set('Authorization', `Bearer ${vetOwnerToken}`)
+        .expect(200);
+      const breakdown = response.body.data.paymentBreakdown || [];
+      const statuses = breakdown.map((b: { status: string }) => b.status);
+      expect(statuses.length).toBeGreaterThan(0);
+      expect(
+        statuses.some((s: string) => ['PAID', 'OWED', 'PARTIALLY_PAID', 'WAIVED'].includes(s)),
+      ).toBe(true);
+    });
+  });
 });

@@ -67,6 +67,15 @@ export class TreatmentsController {
     );
   }
 
+  @Get('scheduled/list')
+  async getScheduledTreatments(
+    @Param('orgId') orgId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.treatmentsService.getScheduledTreatments(orgId, page, limit);
+  }
+
   @Get(':treatmentId')
   async findOne(
     @Param('orgId') orgId: string,
@@ -125,14 +134,5 @@ export class TreatmentsController {
     @Body() dto: MarkPaymentDto,
   ) {
     return this.treatmentsService.markPayment(orgId, treatmentId, user.id, dto);
-  }
-
-  @Get('scheduled/list')
-  async getScheduledTreatments(
-    @Param('orgId') orgId: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-  ) {
-    return this.treatmentsService.getScheduledTreatments(orgId, page, limit);
   }
 }

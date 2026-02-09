@@ -22,8 +22,12 @@ describe('E2E Tests - Complete Application', () => {
   let clientId: string;
   let animalId: string;
   let treatmentId: string;
+  let paymentTreatmentId: string;
+  let scheduledTreatmentId: string;
   let invitationToken: string;
   let membershipId: string;
+  let livestockAnimalId: string;
+  let batchAnimalId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -218,6 +222,31 @@ describe('E2E Tests - Complete Application', () => {
         .set('Authorization', `Bearer ${vet2Token}`)
         .expect(403);
     });
+
+    it('Master admin should list pending org approvals', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/orgs/admin/pending-approvals')
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.success).toBe(true);
+          expect(Array.isArray(res.body.data)).toBe(true);
+          const pending = res.body.data.find((o: { id: string }) => o.id === orgId);
+          expect(pending).toBeDefined();
+          expect(pending.status).toBe('PENDING_APPROVAL');
+        });
+    });
+
+    it('Master admin should approve organization', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/admin/${orgId}/approve`)
+        .set('Authorization', `Bearer ${masterAdminToken}`)
+        .expect(201)
+        .expect((res) => {
+          expect(res.body.success).toBe(true);
+          expect(res.body.data.status).toBe('APPROVED');
+        });
+    });
   });
 
   describe('4. Membership & Invitations', () => {
@@ -384,6 +413,76 @@ describe('E2E Tests - Complete Application', () => {
         })
         .expect(200);
     });
+
+    it('Should register single livestock (patientType SINGLE_LIVESTOCK)', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/${orgId}/animals`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .send({
+          clientId,
+          name: 'Bull-001',
+          species: 'CATTLE',
+          patientType: 'SINGLE_LIVESTOCK',
+          gender: 'MALE',
+          approximateAge: '2 years',
+          weight: 450,
+          weightUnit: 'KG',
+        })
+        .expect(201)
+        .expect((res) => {
+          livestockAnimalId = res.body.data.id;
+          expect(res.body.data.patientType).toBe('SINGLE_LIVESTOCK');
+        });
+    });
+
+    it('Should register batch livestock with batch fields', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/${orgId}/animals`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .send({
+          clientId,
+          name: 'Poultry-Batch-A',
+          species: 'POULTRY',
+          patientType: 'BATCH_LIVESTOCK',
+          batchName: 'Layer Hens - Shed 1',
+          batchSize: 120,
+          batchIdentifier: 'BATCH-2026-001',
+        })
+        .expect(201)
+        .expect((res) => {
+          batchAnimalId = res.body.data.id;
+          expect(res.body.data.patientType).toBe('BATCH_LIVESTOCK');
+          expect(res.body.data.batchName).toBe('Layer Hens - Shed 1');
+          expect(res.body.data.batchSize).toBe(120);
+          expect(res.body.data.batchIdentifier).toBe('BATCH-2026-001');
+        });
+    });
+
+    it('Should register livestock with treatment history backlog', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/${orgId}/animals`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .send({
+          clientId,
+          name: 'Goat-002',
+          species: 'GOAT',
+          patientType: 'SINGLE_LIVESTOCK',
+          gender: 'FEMALE',
+          treatmentHistory: [
+            {
+              visitDate: '2025-06-01',
+              chiefComplaint: 'Routine deworming and vaccination',
+              diagnosis: 'Healthy',
+              treatmentGiven: 'Closantel and multivalent vaccine',
+              notes: 'Previous owner records',
+            },
+          ],
+        })
+        .expect(201)
+        .expect((res) => {
+          expect(res.body.data.id).toBeDefined();
+        });
+    });
   });
 
   describe('7. Treatment Records with Versioning', () => {
@@ -444,6 +543,102 @@ describe('E2E Tests - Complete Application', () => {
         .get(`/api/v1/orgs/${orgId}/animals/${animalId}/treatments`)
         .set('Authorization', `Bearer ${vet1Token}`)
         .expect(200);
+    });
+
+    it('Should create treatment with payment (amount, paymentStatus OWED)', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/${orgId}/treatments`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .send({
+          animalId: livestockAnimalId,
+          visitDate: '2026-02-08',
+          chiefComplaint: 'Routine check and vaccination',
+          treatmentGiven: 'Multivalent vaccine and vitamin B complex',
+          status: 'COMPLETED',
+          amount: 15000,
+          currency: 'NGN',
+          paymentStatus: 'OWED',
+        })
+        .expect(201)
+        .expect((res) => {
+          paymentTreatmentId = res.body.data.id;
+          expect(res.body.data.amount).toBeDefined();
+          expect(res.body.data.paymentStatus).toBe('OWED');
+        });
+    });
+
+    it('Should create scheduled treatment', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/${orgId}/treatments`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .send({
+          animalId,
+          visitDate: '2026-02-10',
+          chiefComplaint: 'Scheduled follow-up visit',
+          treatmentGiven: 'To be determined on visit',
+          isScheduled: true,
+          scheduledFor: '2026-02-15T09:00:00.000Z',
+          status: 'IN_PROGRESS',
+        })
+        .expect(201)
+        .expect((res) => {
+          scheduledTreatmentId = res.body.data.id;
+          expect(res.body.data.isScheduled).toBe(true);
+          expect(res.body.data.scheduledFor).toBeDefined();
+        });
+    });
+
+    it('Should list scheduled treatments', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/orgs/${orgId}/treatments/scheduled/list`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.success).toBe(true);
+          expect(Array.isArray(res.body.data.treatments)).toBe(true);
+          const scheduled = res.body.data.treatments.find(
+            (t: { id: string }) => t.id === scheduledTreatmentId,
+          );
+          expect(scheduled).toBeDefined();
+        });
+    });
+
+    it('Should mark treatment payment (PAID)', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/orgs/${orgId}/treatments/${paymentTreatmentId}/payment`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .send({
+          paymentStatus: 'PAID',
+          amountPaid: 15000,
+          paymentNotes: 'Paid in full',
+        })
+        .expect(201)
+        .expect((res) => {
+          expect(res.body.data.paymentStatus).toBe('PAID');
+        });
+    });
+  });
+
+  describe('7b. Revenue', () => {
+    it('OWNER/ADMIN should get org revenue', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/orgs/${orgId}/revenue`)
+        .set('Authorization', `Bearer ${vet1Token}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.success).toBe(true);
+          expect(res.body.data.totalRevenue).toBeDefined();
+          expect(res.body.data.totalPaid).toBeDefined();
+          expect(res.body.data.totalOwed).toBeDefined();
+          expect(res.body.data.paymentBreakdown).toBeDefined();
+        });
+    });
+
+    it('MEMBER should NOT get org revenue', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/orgs/${orgId}/revenue`)
+        .set('Authorization', `Bearer ${vet2Token}`)
+        .expect(403);
     });
   });
 

@@ -7,22 +7,20 @@ This document describes the comprehensive end-to-end test coverage for the Veter
 The E2E tests are organized into two main suites:
 
 ### 1. **Basic Automated Tests** (`e2e-automated.e2e-spec.ts`)
-**36 passing tests** covering core functionality
+**48+ passing tests** covering core functionality and v1.1 features
 
 #### Test Scenarios:
-1. **Health Check & Public Routes** (1 test)
-   - Basic API health endpoint
+1. **Health Check & Public Routes** (2 tests)
+   - Basic API health endpoint, welcome message
 
-2. **Vet Registration & Approval** (4 tests)
-   - New vet registration
-   - Profile completion
-   - Master admin approval workflow
-   - Status enforcement
+2. **Vet Registration & Approval** (3 tests)
+   - Profile and approval status
 
-3. **Organization Management** (2 tests)
+3. **Organization Management** (6 tests)
    - Organization creation
    - Organization details retrieval
    - Non-member access blocking
+   - **Master admin: list pending org approvals, approve organization**
 
 4. **Membership & Invitations** (5 tests)
    - Vet invitation to organization
@@ -36,17 +34,27 @@ The E2E tests are organized into two main suites:
    - Search functionality
    - Client updates
 
-6. **Animal Management** (4 tests)
+6. **Animal Management** (7 tests)
    - Animal registration
    - Microchip uniqueness enforcement
    - Client's animal listing
    - Death recording
+   - **Single livestock (SINGLE_LIVESTOCK), batch livestock (BATCH_LIVESTOCK with batchName/batchSize/batchIdentifier)**
+   - **Livestock with treatment history backlog**
 
-7. **Treatment Records with Versioning** (4 tests)
+7. **Treatment Records with Versioning** (8 tests)
    - Treatment record creation
    - Immutable versioning on updates
    - Version history retrieval
    - Animal treatment history
+   - **Treatment with payment (amount, paymentStatus OWED)**
+   - **Scheduled treatment (isScheduled, scheduledFor)**
+   - **List scheduled treatments**
+   - **Mark treatment payment (PAID)**
+
+7b. **Revenue** (2 tests)
+   - **OWNER/ADMIN get org revenue**
+   - **MEMBER cannot access revenue**
 
 8. **Soft Delete & Cascade** (6 tests)
    - Permission-based delete authorization
@@ -66,7 +74,7 @@ The E2E tests are organized into two main suites:
 ---
 
 ### 2. **Deep Scenario Tests** (`e2e-deep-scenarios.e2e-spec.ts`)
-**111 tests** covering complex real-world workflows
+**130+ tests** covering complex real-world workflows and v1.1 super-deep scenarios
 
 #### Advanced Scenarios:
 
@@ -162,6 +170,29 @@ The E2E tests are organized into two main suites:
 - Alive vs deceased tracking
 - Statistical queries
 
+**Scenario 19: Organization Approval Workflow (Master Admin)** *(v1.1)*
+- List pending organization approvals
+- Approve organization
+- Reject organization with reason
+- Suspend and reactivate organization
+
+**Scenario 20: Patient Types, Batch Livestock & Treatment History Backlog** *(v1.1)*
+- Single livestock (SINGLE_LIVESTOCK) registration
+- Batch livestock with batchName, batchSize, batchIdentifier
+- Livestock with treatment history backlog (multiple prior treatments)
+- Verify backlog creates treatment records
+
+**Scenario 21: Scheduled Treatments & Payment Lifecycle** *(v1.1)*
+- Create treatment with payment (OWED)
+- Create multiple scheduled treatments
+- List scheduled treatments
+- Mark treatment as PAID
+
+**Scenario 22: Revenue & Payment Breakdown (Deep)** *(v1.1)*
+- OWNER/ADMIN get revenue and payment breakdown
+- MEMBER cannot access revenue
+- Payment breakdown includes PAID/OWED (and related) counts
+
 ---
 
 ## Running Tests
@@ -170,24 +201,24 @@ The E2E tests are organized into two main suites:
 ```bash
 npm run test:e2e
 ```
-**Runs:** 36 core tests  
-**Duration:** ~60-80 seconds  
-**Coverage:** All essential backend features
+**Runs:** 48+ core tests (including v1.1)  
+**Duration:** ~60-90 seconds  
+**Coverage:** All essential backend features + org approval, patient types, payment, revenue
 
 ### Deep Scenario Tests (Comprehensive)
 ```bash
 npm run test:e2e:deep
 ```
-**Runs:** 111 advanced tests  
-**Duration:** ~90-120 seconds  
-**Coverage:** Complex real-world workflows
+**Runs:** 130+ advanced tests  
+**Duration:** ~2-3 minutes  
+**Coverage:** Complex real-world workflows + super-deep v1.1 scenarios
 
 ### All Tests (Sequential)
 ```bash
 npm run test:e2e:all
 ```
-**Runs:** Both suites sequentially (147 total tests)  
-**Duration:** ~3-4 minutes  
+**Runs:** Both suites sequentially (178+ total tests)  
+**Duration:** ~4-5 minutes  
 **Note:** Uses `--runInBand` to prevent database conflicts
 
 ---
@@ -246,9 +277,14 @@ npx prisma generate
 |---------|------------|-----------|----------------|
 | Authentication & Authorization | ✅ | ✅✅✅ | Comprehensive |
 | Organization Management | ✅ | ✅✅ | Excellent |
+| **Org Approval (Master Admin)** | ✅ | ✅✅ | Excellent |
 | Client Management | ✅ | ✅✅ | Excellent |
 | Animal Management | ✅ | ✅✅✅ | Comprehensive |
+| **Patient Types & Batch Livestock** | ✅ | ✅✅ | Excellent |
+| **Treatment History Backlog** | ✅ | ✅ | Good |
 | Treatment Records | ✅ | ✅✅✅ | Comprehensive |
+| **Scheduled Treatments** | ✅ | ✅✅ | Excellent |
+| **Payment & Revenue** | ✅ | ✅✅ | Excellent |
 | Soft Delete & Restore | ✅ | ✅✅ | Excellent |
 | Activity Logging | ✅ | ✅✅ | Excellent |
 | Audit Trail | ❌ | ✅ | Good |
@@ -261,7 +297,7 @@ npx prisma generate
 | Concurrent Operations | ❌ | ✅ | Good |
 | Real-World Workflows | ❌ | ✅✅✅ | Excellent |
 
-**Total Test Coverage:** 147 tests across 36 core features and 111 deep scenarios
+**Total Test Coverage:** 178+ tests across 48+ core features and 130+ deep scenarios
 
 ---
 
@@ -330,7 +366,7 @@ When adding new features, please:
 
 ---
 
-**Last Updated:** February 8, 2026  
-**Test Suite Version:** 1.0  
-**Passing Tests:** 36/36 (basic), 0/111 (deep - pending DB setup fixes)  
-**Total Coverage:** 147 E2E tests
+**Last Updated:** February 9, 2026  
+**Test Suite Version:** 1.1  
+**Passing Tests:** 48+ (basic), 130+ (deep)  
+**Total Coverage:** 178+ E2E tests (includes v1.1: org approval, patient types, payment, revenue, scheduled treatments)
