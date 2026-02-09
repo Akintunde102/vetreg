@@ -3,8 +3,8 @@
 ## Veterinary Registration & Practice Management Platform
 
 **Document Version:** 1.1.0
-**Last Updated:** February 8, 2026
-**Status:** Draft
+**Last Updated:** February 9, 2026
+**Status:** Draft (Backend v1.1 implemented)
 **Author:** Engineering Team
 **Stakeholders:** Product, Engineering, Compliance, Operations
 
@@ -168,6 +168,19 @@ Google OAuth
                     │           └── Medical Treatment Records
                     └── Organization Settings
 ```
+
+### 5.3 Version 1.1 Additions (Backend Implemented — February 2026)
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Patient types** | Single Pet, Single Livestock, Batch Livestock; batch fields (batchName, batchSize, batchIdentifier) on Animal | ✅ Backend done |
+| **Organization approval** | Organizations require manual approval by Master Admin (PENDING_APPROVAL → APPROVED/REJECTED/SUSPENDED); admin endpoints for approve/reject/suspend/reactivate | ✅ Backend done |
+| **Treatment payment tracking** | Per-treatment amount, currency, payment status (PAID, OWED, PARTIALLY_PAID, WAIVED); paidAt, paidBy; mark payment endpoint | ✅ Backend done |
+| **Scheduled treatments** | Vets can schedule treatments in advance (isScheduled, scheduledFor); list scheduled treatments endpoint | ✅ Backend done |
+| **Treatment history import** | When adding livestock, optional array of previous treatment history (backlog) for onboarding/migration | ✅ Backend done |
+| **Organization revenue** | GET /orgs/:orgId/revenue — totalRevenue, totalPaid, totalOwed, paymentBreakdown by status (OWNER/ADMIN only) | ✅ Backend done |
+
+See backend documentation: [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md), [API_ENDPOINTS_V1.1.md](../backend/docs/API_ENDPOINTS_V1.1.md).
 
 ---
 

@@ -3,13 +3,14 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { ActivityLogService } from '../common/services/activity-log.service';
-import { MembershipRole, MembershipStatus } from '@prisma/client';
+import { MembershipRole, MembershipStatus, OrgStatus } from '@prisma/client';
 import slugify from 'slugify';
 
 @Injectable()
@@ -249,5 +250,279 @@ export class OrganizationsService {
 
   async getActivityLogs(orgId: string, page: number = 1, limit: number = 50) {
     return this.activityLogService.getOrganizationLogs(orgId, page, limit);
+  }
+
+  // Organization approval methods
+  async getPendingApprovals() {
+    return this.prisma.organization.findMany({
+      where: {
+        status: OrgStatus.PENDING_APPROVAL,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phoneNumber: true,
+          },
+        },
+        _count: {
+          select: {
+            memberships: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async approveOrganization(adminId: string, orgId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+
+    if (!org) {
+      throw new NotFoundException({
+        code: 'ORG_NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
+
+    if (org.status !== OrgStatus.PENDING_APPROVAL) {
+      throw new BadRequestException({
+        code: 'ORG_NOT_PENDING',
+        message: 'Organization is not pending approval',
+        details: { currentStatus: org.status },
+      });
+    }
+
+    const updatedOrg = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        status: OrgStatus.APPROVED,
+        approvedAt: new Date(),
+        approvedBy: adminId,
+      },
+    });
+
+    await this.auditLogService.log({
+      vetId: adminId,
+      action: 'organization.approved',
+      entityType: 'organization',
+      entityId: orgId,
+      metadata: { organizationName: org.name },
+    });
+
+    await this.activityLogService.log({
+      organizationId: orgId,
+      vetId: adminId,
+      action: 'organization.approved',
+      entityType: 'organization',
+      entityId: orgId,
+      description: `Organization was approved by admin`,
+    });
+
+    return updatedOrg;
+  }
+
+  async rejectOrganization(adminId: string, orgId: string, reason: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+
+    if (!org) {
+      throw new NotFoundException({
+        code: 'ORG_NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
+
+    if (org.status !== OrgStatus.PENDING_APPROVAL) {
+      throw new BadRequestException({
+        code: 'ORG_NOT_PENDING',
+        message: 'Organization is not pending approval',
+        details: { currentStatus: org.status },
+      });
+    }
+
+    const updatedOrg = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        status: OrgStatus.REJECTED,
+        rejectedAt: new Date(),
+        rejectedBy: adminId,
+        rejectionReason: reason,
+      },
+    });
+
+    await this.auditLogService.log({
+      vetId: adminId,
+      action: 'organization.rejected',
+      entityType: 'organization',
+      entityId: orgId,
+      metadata: { organizationName: org.name, reason },
+    });
+
+    await this.activityLogService.log({
+      organizationId: orgId,
+      vetId: adminId,
+      action: 'organization.rejected',
+      entityType: 'organization',
+      entityId: orgId,
+      description: `Organization was rejected by admin (Reason: ${reason})`,
+    });
+
+    return updatedOrg;
+  }
+
+  async suspendOrganization(adminId: string, orgId: string, reason: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+
+    if (!org) {
+      throw new NotFoundException({
+        code: 'ORG_NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
+
+    if (org.status === OrgStatus.SUSPENDED) {
+      throw new BadRequestException({
+        code: 'ORG_ALREADY_SUSPENDED',
+        message: 'Organization is already suspended',
+      });
+    }
+
+    const updatedOrg = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        status: OrgStatus.SUSPENDED,
+        suspendedAt: new Date(),
+        suspendedBy: adminId,
+        suspensionReason: reason,
+      },
+    });
+
+    await this.auditLogService.log({
+      vetId: adminId,
+      action: 'organization.suspended',
+      entityType: 'organization',
+      entityId: orgId,
+      metadata: { organizationName: org.name, reason },
+    });
+
+    await this.activityLogService.log({
+      organizationId: orgId,
+      vetId: adminId,
+      action: 'organization.suspended',
+      entityType: 'organization',
+      entityId: orgId,
+      description: `Organization was suspended by admin (Reason: ${reason})`,
+    });
+
+    return updatedOrg;
+  }
+
+  async reactivateOrganization(adminId: string, orgId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+
+    if (!org) {
+      throw new NotFoundException({
+        code: 'ORG_NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
+
+    if (org.status !== OrgStatus.SUSPENDED) {
+      throw new BadRequestException({
+        code: 'ORG_NOT_SUSPENDED',
+        message: 'Organization is not suspended',
+        details: { currentStatus: org.status },
+      });
+    }
+
+    const updatedOrg = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        status: OrgStatus.APPROVED,
+        reactivatedAt: new Date(),
+        reactivatedBy: adminId,
+        suspendedAt: null,
+        suspensionReason: null,
+      },
+    });
+
+    await this.auditLogService.log({
+      vetId: adminId,
+      action: 'organization.reactivated',
+      entityType: 'organization',
+      entityId: orgId,
+      metadata: { organizationName: org.name },
+    });
+
+    await this.activityLogService.log({
+      organizationId: orgId,
+      vetId: adminId,
+      action: 'organization.reactivated',
+      entityType: 'organization',
+      entityId: orgId,
+      description: `Organization was reactivated by admin`,
+    });
+
+    return updatedOrg;
+  }
+
+  async getRevenue(orgId: string) {
+    const revenue = await this.prisma.treatmentRecord.aggregate({
+      where: {
+        organizationId: orgId,
+        isDeleted: false,
+        amount: { not: null },
+      },
+      _sum: {
+        amount: true,
+        amountPaid: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const paymentBreakdown = await this.prisma.treatmentRecord.groupBy({
+      by: ['paymentStatus'],
+      where: {
+        organizationId: orgId,
+        isDeleted: false,
+        paymentStatus: { not: null },
+      },
+      _sum: {
+        amount: true,
+        amountPaid: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalRevenue = revenue._sum.amount || 0;
+    const totalPaid = revenue._sum.amountPaid || 0;
+    const totalOwed = Number(totalRevenue) - Number(totalPaid);
+
+    return {
+      totalRevenue: totalRevenue.toString(),
+      totalPaid: totalPaid.toString(),
+      totalOwed: totalOwed.toString(),
+      totalTreatments: revenue._count.id,
+      paymentBreakdown: paymentBreakdown.map((item) => ({
+        status: item.paymentStatus,
+        count: item._count.id,
+        totalAmount: item._sum.amount?.toString() || '0',
+        amountPaid: item._sum.amountPaid?.toString() || '0',
+      })),
+    };
   }
 }

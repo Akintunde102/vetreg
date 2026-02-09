@@ -53,19 +53,19 @@ backend/
 - [x] CORS configuration
 - [x] Rate limiting (ThrottleGuard)
 
-### ✅ Database Schema (Complete)
+### ✅ Database Schema (Complete - v1.1)
 - [x] Complete Prisma schema with all models:
   - Vets (with approval workflow)
-  - Organizations
+  - Organizations (with approval workflow ✨ v1.1)
   - OrgMemberships (with granular permissions)
   - Invitations
   - Clients (with soft delete)
-  - Animals (with soft delete)
-  - TreatmentRecords (with versioning & soft delete)
+  - Animals (with soft delete, patient types ✨ v1.1)
+  - TreatmentRecords (with versioning, soft delete, payment tracking, scheduling ✨ v1.1)
   - Notifications
   - AuditLogs
   - ActivityLogs
-- [x] All enums defined
+- [x] All enums defined (including PatientType, PaymentStatus, OrgStatus ✨ v1.1)
 - [x] Proper indexes for performance
 - [x] Foreign key relationships
 
@@ -98,7 +98,7 @@ backend/
 - [x] Complete service logic
 - [x] Audit logging
 
-### ✅ Organizations Module (Complete)
+### ✅ Organizations Module (Complete - v1.1 Enhanced)
 - [x] Create organization
 - [x] Get all user organizations
 - [x] Get organization details
@@ -109,6 +109,13 @@ backend/
 - [x] Slug generation with uniqueness
 - [x] Complete DTOs
 - [x] Activity logging
+- [x] **Organization approval workflow (Master Admin)** ✨ v1.1
+- [x] **Get pending approvals** ✨ v1.1
+- [x] **Approve organization** ✨ v1.1
+- [x] **Reject organization** ✨ v1.1
+- [x] **Suspend organization** ✨ v1.1
+- [x] **Reactivate organization** ✨ v1.1
+- [x] **Get organization revenue** ✨ v1.1
 
 ### ✅ Memberships & Invitations Module (Complete) ✨ NEW
 - [x] Create invitation (OWNER/ADMIN)
@@ -137,7 +144,7 @@ backend/
 - [x] Search by name, email, phone
 - [x] All DTOs with validation
 
-### ✅ Animals Module (Complete) ✨ NEW
+### ✅ Animals Module (Complete - v1.1 Enhanced) ✨
 - [x] Register animal
 - [x] Get all animals (pagination, filters)
 - [x] Get animal details
@@ -149,8 +156,11 @@ backend/
 - [x] Microchip uniqueness validation
 - [x] Cascade soft delete to treatments
 - [x] All DTOs with validation
+- [x] **Patient types (Single Pet, Single Livestock, Batch Livestock)** ✨ v1.1
+- [x] **Batch livestock management** ✨ v1.1
+- [x] **Treatment history import** ✨ v1.1
 
-### ✅ Treatments Module (Complete with Versioning) ✨ NEW
+### ✅ Treatments Module (Complete - v1.1 Enhanced) ✨
 - [x] Create treatment record
 - [x] Get all treatments (pagination, filters)
 - [x] Get treatment details
@@ -161,18 +171,34 @@ backend/
 - [x] Versioning system (immutable old versions)
 - [x] Parent-child version tracking
 - [x] All DTOs with validation
+- [x] **Payment tracking (amount, status, paid by)** ✨ v1.1
+- [x] **Mark payment endpoint** ✨ v1.1
+- [x] **Scheduled treatments** ✨ v1.1
+- [x] **Get scheduled treatments** ✨ v1.1
+
+## Current Version: 1.1.0
+
+### 🆕 Version 1.1.0 Features (February 9, 2026)
+- ✅ Patient types enhancement (Single Pet, Single Livestock, Batch Livestock)
+- ✅ Organization approval workflow (Master Admin)
+- ✅ Treatment payment tracking
+- ✅ Scheduled treatments
+- ✅ Treatment history import for livestock
+- ✅ Organization revenue tracking
+
+See `/backend/docs/NEW_FEATURES.md` for comprehensive documentation.
 
 ## Remaining Features to Implement
 
 ### 🔲 Master Admin Dashboard (10 tasks - Partially functional)
 Priority: **P1**
 
-**Note**: Basic admin features already work via the Vets module. This epic is for enhanced dashboard features.
+**Note**: Basic admin features already work via the Vets and Organizations modules. This epic is for enhanced dashboard features.
 
 Endpoints needed:
 - `GET /admin/dashboard/stats` - Platform statistics
-- `GET /admin/vets` - All vets with filters
-- `GET /admin/organizations` - All organizations
+- `GET /admin/vets` - All vets with filters (exists)
+- `GET /admin/organizations` - All organizations (exists)
 - `GET /admin/audit-logs` - Platform-wide audit logs
 - `GET /admin/analytics` - Usage analytics
 

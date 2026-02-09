@@ -2,6 +2,29 @@
 
 This folder contains all project documentation, specifications, and task lists.
 
+**Current Backend Version:** 1.1.0 (February 9, 2026)
+
+---
+
+## 🆕 Version 1.1.0 — Backend Implementation Complete
+
+The backend has been enhanced with the following features. See **[backend/docs](./../backend/docs/)** for full API and migration details.
+
+| Feature | Status | Documentation |
+|--------|--------|----------------|
+| Patient types (Single Pet, Single Livestock, Batch Livestock) | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
+| Organization approval by Master Admin | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
+| Treatment payment tracking (paid/owed) | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
+| Scheduled treatments | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
+| Treatment history import for livestock | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
+| Organization revenue tracking | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
+
+**Quick links:**
+- [Backend API reference (v1.1)](../backend/docs/API_ENDPOINTS_V1.1.md)
+- [Migration guide (v1.0 → v1.1)](../backend/docs/MIGRATION_GUIDE.md)
+- [Deployment & testing](./DEPLOYMENT_AND_TESTING.md)
+- [Test results summary](./TEST_RESULTS.md)
+
 ---
 
 ## 📄 Documents
@@ -192,10 +215,11 @@ Phase 6 — Polish & Ship (Epic 15)
 
 ## 🚀 Next Steps
 
-1. **For Backend Developers:** Start with [BACKEND_TASKS.md](./BACKEND_TASKS.md) Epic 1-3
+1. **For Backend Developers:** Start with [BACKEND_TASKS.md](./BACKEND_TASKS.md) Epic 1-3; then see [backend/docs](../backend/docs/) for v1.1 API and migration.
 2. **For Frontend Developers:** Start with [FRONTEND_TASKS.md](./FRONTEND_TASKS.md) Epic 1-3
 3. **For Full-Stack Developers:** Follow the build order in [TASKS_MASTER.md](./TASKS_MASTER.md)
 4. **For Product/Design:** Review [PRD.md](./PRD.md) for complete feature specifications
+5. **For Deployment & Testing:** See [DEPLOYMENT_AND_TESTING.md](./DEPLOYMENT_AND_TESTING.md)
 
 ---
 
@@ -205,7 +229,8 @@ For questions about the PRD or tasks, refer to:
 - PRD Section 31: Glossary (definitions of all key terms)
 - PRD Section 24: Error Handling & Edge Cases (comprehensive scenario matrix)
 - PRD Section 21: API Design (complete endpoint reference with guards, roles, permissions)
+- Backend v1.1: [backend/docs/README.md](../backend/docs/README.md) and [API_ENDPOINTS_V1.1.md](../backend/docs/API_ENDPOINTS_V1.1.md)
 
 ---
 
-*Last Updated: February 8, 2026*
+*Last Updated: February 9, 2026*

@@ -1,10 +1,14 @@
+import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
+import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('E2E Tests - Complete Application', () => {
+  jest.setTimeout(60000); // DB connection + full flow can be slow on real Supabase
+
   let app: INestApplication;
   let prisma: PrismaService;
   
@@ -36,6 +40,7 @@ describe('E2E Tests - Complete Application', () => {
       }),
     );
 
+    app.setGlobalPrefix('api/v1');
     await app.init();
     prisma = app.get(PrismaService);
     
@@ -44,7 +49,7 @@ describe('E2E Tests - Complete Application', () => {
     
     // Setup test users
     await setupTestData();
-  });
+  }, 55000);
 
   afterAll(async () => {
     await cleanDatabase();
@@ -103,10 +108,20 @@ describe('E2E Tests - Complete Application', () => {
     vet1Id = vet1.id;
     vet2Id = vet2.id;
 
-    // Generate mock JWT tokens (in real tests, use Supabase test tokens)
-    masterAdminToken = 'mock-master-admin-token';
-    vet1Token = 'mock-vet1-token';
-    vet2Token = 'mock-vet2-token';
+    // Generate real JWTs signed with SUPABASE_JWT_SECRET so auth works against real DB
+    const jwtService = app.get(JwtService);
+    masterAdminToken = await jwtService.signAsync({
+      sub: 'auth-master-admin',
+      email: 'admin@vetplatform.com',
+    });
+    vet1Token = await jwtService.signAsync({
+      sub: 'auth-vet-1',
+      email: 'vet1@example.com',
+    });
+    vet2Token = await jwtService.signAsync({
+      sub: 'auth-vet-2',
+      email: 'vet2@example.com',
+    });
   }
 
   describe('1. Health & Public Endpoints', () => {
@@ -115,8 +130,9 @@ describe('E2E Tests - Complete Application', () => {
         .get('/api/v1/health')
         .expect(200)
         .expect((res) => {
-          expect(res.body.status).toBe('ok');
-          expect(res.body.service).toBe('vet-reg-backend');
+          const body = res.body?.data ?? res.body;
+          expect(body.status).toBe('ok');
+          expect(body.service).toBe('vet-reg-backend');
         });
     });
 
@@ -246,8 +262,9 @@ describe('E2E Tests - Complete Application', () => {
         .patch(`/api/v1/orgs/${orgId}/members/${membershipId}/permissions`)
         .set('Authorization', `Bearer ${vet1Token}`)
         .send({
-          canDeleteClients: true,
-          canDeleteAnimals: true,
+          canDeleteClients: false,
+          canDeleteAnimals: false,
+          canViewActivityLog: false,
         })
         .expect(200);
     });
@@ -371,11 +388,12 @@ describe('E2E Tests - Complete Application', () => {
 
   describe('7. Treatment Records with Versioning', () => {
     beforeAll(async () => {
-      // Reset animal to alive for treatment tests
-      await prisma.animal.update({
-        where: { id: animalId },
-        data: { isAlive: true },
-      });
+      if (animalId) {
+        await prisma.animal.update({
+          where: { id: animalId },
+          data: { isAlive: true },
+        });
+      }
     });
 
     it('Should create treatment record', () => {
@@ -430,10 +448,12 @@ describe('E2E Tests - Complete Application', () => {
   });
 
   describe('8. Soft Delete & Cascade', () => {
-    it('Should require permission to delete', () => {
-      // vet1 is OWNER, should work
-      // vet2 is MEMBER with permission, should work
-      // Test without permission by creating new member
+    it('MEMBER without delete permission should get 403', () => {
+      return request(app.getHttpServer())
+        .delete(`/api/v1/orgs/${orgId}/animals/${animalId}`)
+        .set('Authorization', `Bearer ${vet2Token}`)
+        .send({ reason: 'Test' })
+        .expect(403);
     });
 
     it('Should require deletion reason', () => {
@@ -471,7 +491,7 @@ describe('E2E Tests - Complete Application', () => {
       return request(app.getHttpServer())
         .post(`/api/v1/orgs/${orgId}/animals/${animalId}/restore`)
         .set('Authorization', `Bearer ${vet1Token}`)
-        .expect(200);
+        .expect(201);
     });
 
     it('Should cascade delete client', () => {

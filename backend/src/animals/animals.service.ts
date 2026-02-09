@@ -37,6 +37,17 @@ export class AnimalsService {
       });
     }
 
+    // Validate batch livestock fields
+    if (dto.patientType === 'BATCH_LIVESTOCK') {
+      if (!dto.batchName || !dto.batchSize) {
+        throw new BadRequestException({
+          code: 'BATCH_FIELDS_REQUIRED',
+          message:
+            'Batch name and batch size are required for batch livestock',
+        });
+      }
+    }
+
     // Check microchip uniqueness within organization
     if (dto.microchipNumber) {
       const existingMicrochip = await this.prisma.animal.findFirst({
@@ -50,42 +61,76 @@ export class AnimalsService {
       if (existingMicrochip) {
         throw new ConflictException({
           code: 'MICROCHIP_EXISTS',
-          message: 'This microchip number is already registered in your organization',
+          message:
+            'This microchip number is already registered in your organization',
         });
       }
     }
 
-    const animal = await this.prisma.animal.create({
-      data: {
-        organizationId,
-        clientId: dto.clientId,
-        createdBy: vetId,
-        name: dto.name,
-        species: dto.species,
-        breed: dto.breed,
-        color: dto.color,
-        gender: dto.gender,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-        approximateAge: dto.approximateAge,
-        weight: dto.weight,
-        weightUnit: dto.weightUnit,
-        microchipNumber: dto.microchipNumber,
-        identifyingMarks: dto.identifyingMarks,
-        photoUrl: dto.photoUrl,
-        notes: dto.notes,
-      },
+    // Create animal and optionally add treatment history in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      const animal = await tx.animal.create({
+        data: {
+          organizationId,
+          clientId: dto.clientId,
+          createdBy: vetId,
+          name: dto.name,
+          species: dto.species,
+          breed: dto.breed,
+          color: dto.color,
+          gender: dto.gender,
+          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+          approximateAge: dto.approximateAge,
+          weight: dto.weight,
+          weightUnit: dto.weightUnit,
+          microchipNumber: dto.microchipNumber,
+          identifyingMarks: dto.identifyingMarks,
+          photoUrl: dto.photoUrl,
+          notes: dto.notes,
+          patientType: dto.patientType || 'SINGLE_PET',
+          batchName: dto.batchName,
+          batchSize: dto.batchSize,
+          batchIdentifier: dto.batchIdentifier,
+        },
+      });
+
+      // Import treatment history if provided
+      if (dto.treatmentHistory && dto.treatmentHistory.length > 0) {
+        const treatmentRecords = dto.treatmentHistory.map((history) => ({
+          organizationId,
+          animalId: animal.id,
+          vetId,
+          version: 1,
+          isLatestVersion: true,
+          visitDate: new Date(history.visitDate),
+          chiefComplaint: history.chiefComplaint,
+          diagnosis: history.diagnosis,
+          treatmentGiven: history.treatmentGiven,
+          notes: history.notes,
+          status: 'COMPLETED' as const,
+        }));
+
+        await tx.treatmentRecord.createMany({
+          data: treatmentRecords,
+        });
+      }
+
+      return animal;
     });
 
     await this.auditLogService.log({
       vetId,
       action: 'animal.created',
       entityType: 'animal',
-      entityId: animal.id,
+      entityId: result.id,
       metadata: {
         organizationId,
         clientId: dto.clientId,
-        animalName: animal.name,
-        species: animal.species,
+        animalName: result.name,
+        species: result.species,
+        patientType: result.patientType,
+        batchSize: result.batchSize,
+        treatmentHistoryCount: dto.treatmentHistory?.length || 0,
       },
     });
 
@@ -94,11 +139,14 @@ export class AnimalsService {
       vetId,
       action: 'animal.created',
       entityType: 'animal',
-      entityId: animal.id,
-      description: `Registered ${animal.species.toLowerCase()}: ${animal.name} for ${client.firstName} ${client.lastName}`,
+      entityId: result.id,
+      description:
+        result.patientType === 'BATCH_LIVESTOCK'
+          ? `Registered batch livestock: ${result.batchName} (${result.batchSize} ${result.species.toLowerCase()}) for ${client.firstName} ${client.lastName}`
+          : `Registered ${result.species.toLowerCase()}: ${result.name} for ${client.firstName} ${client.lastName}`,
     });
 
-    return animal;
+    return result;
   }
 
   async findAll(

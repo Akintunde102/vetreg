@@ -1,9 +1,11 @@
 # V1 Task List — Veterinary Registration & Practice Management Platform
 
 **Generated from:** PRD v1.1.0
-**Date:** February 8, 2026
+**Last Updated:** February 9, 2026
 **Total Epics:** 15
-**Total Tasks:** ~130
+**Total Tasks:** ~250 (backend + frontend)
+
+**Backend v1.1:** Patient types, organization approval, payment tracking, scheduled treatments, treatment history import, and organization revenue are implemented. See [BACKEND_TASKS.md](./BACKEND_TASKS.md) for detailed backend status and [backend/docs/NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) for v1.1 API.
 
 Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Should have | `P2` = Nice to have
 
@@ -38,8 +40,8 @@ Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Shoul
 
 > Define all database tables, enums, indexes, and RLS policies as per the PRD.
 
-- [ ] **2.1** Write Prisma schema with all models: Vet, Organization, OrgMembership, Invitation, Client, Animal, TreatmentRecord, Notification, AuditLog, ActivityLog `P0`
-- [ ] **2.2** Define all enums: VetStatus, OrgType, MembershipRole, MembershipStatus, InvitationStatus, AnimalSpecies, AnimalGender, WeightUnit, TemperatureUnit, TreatmentStatus, NotificationType, NotificationChannel, DeliveryStatus, Gender, PracticeType `P0`
+- [x] **2.1** Write Prisma schema with all models: Vet, Organization, OrgMembership, Invitation, Client, Animal, TreatmentRecord, Notification, AuditLog, ActivityLog (+ v1.1: PatientType, PaymentStatus, OrgStatus, new fields) `P0`
+- [x] **2.2** Define all enums: VetStatus, OrgType, MembershipRole, MembershipStatus, InvitationStatus, AnimalSpecies, AnimalGender, WeightUnit, TemperatureUnit, TreatmentStatus, NotificationType, NotificationChannel, DeliveryStatus, Gender, PracticeType, PatientType, PaymentStatus, OrgStatus `P0`
 - [ ] **2.3** Add all indexes as defined in PRD Section 20.3 `P0`
 - [ ] **2.4** Add soft-delete fields (isDeleted, deletedAt, deletedBy, deletionReason) to Client, Animal, TreatmentRecord models `P0`
 - [ ] **2.5** Add granular permission fields (canDeleteClients, canDeleteAnimals, canDeleteTreatments, canViewActivityLog) to OrgMembership model `P0`
@@ -134,18 +136,19 @@ Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Shoul
 
 ## Epic 6: Organization Management
 
-> Create, update, view organizations; organization switcher; multi-org support.
+> Create, update, view organizations; organization switcher; multi-org support. **v1.1:** Organization approval by Master Admin; org revenue endpoint.
 
 ### Backend
 
-- [ ] **6.1** Create `OrganizationModule` with `OrganizationController` and `OrganizationService` `P0`
-- [ ] **6.2** Implement `POST /orgs` — create org, auto-create OWNER membership, generate slug `P0`
-- [ ] **6.3** Implement `GET /orgs` — list organizations the vet belongs to `P0`
-- [ ] **6.4** Implement `GET /orgs/:orgId` — get org details (guarded by OrgScope) `P0`
-- [ ] **6.5** Implement `PATCH /orgs/:orgId` — update org details (ADMIN+ only) `P0`
+- [x] **6.1** Create `OrganizationModule` with `OrganizationController` and `OrganizationService` `P0`
+- [x] **6.2** Implement `POST /orgs` — create org, auto-create OWNER membership, generate slug `P0`
+- [x] **6.3** Implement `GET /orgs` — list organizations the vet belongs to `P0`
+- [x] **6.4** Implement `GET /orgs/:orgId` — get org details (guarded by OrgScope) `P0`
+- [x] **6.5** Implement `PATCH /orgs/:orgId` — update org details (ADMIN+ only) `P0`
 - [ ] **6.6** Implement `GET /orgs/:orgId/stats` — org-level statistics (client/animal/treatment counts) `P2`
-- [ ] **6.7** Create DTOs: CreateOrganizationDto, UpdateOrganizationDto `P0`
+- [x] **6.7** Create DTOs: CreateOrganizationDto, UpdateOrganizationDto `P0`
 - [ ] **6.8** Write unit tests for OrganizationService `P0`
+- [x] **6.9** (v1.1) Organization approval workflow + GET /orgs/:orgId/revenue `P0`
 
 ### Frontend
 
@@ -227,20 +230,20 @@ Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Shoul
 
 ## Epic 9: Animal Management
 
-> Full CRUD for animals linked to clients, including soft-delete with permission.
+> Full CRUD for animals linked to clients, including soft-delete with permission. **v1.1:** Patient types (Single Pet, Single Livestock, Batch Livestock); treatment history import when adding livestock.
 
 ### Backend
 
-- [ ] **9.1** Create `AnimalModule` with `AnimalController` and `AnimalService` `P0`
-- [ ] **9.2** Implement `POST /orgs/:orgId/animals` — register animal; validate clientId belongs to same org; check microchip uniqueness `P0`
-- [ ] **9.3** Implement `GET /orgs/:orgId/animals` — list animals with pagination, search, sort, filter (exclude deleted by default) `P0`
-- [ ] **9.4** Implement `GET /orgs/:orgId/animals/:animalId` — get animal detail with client info and treatment count `P0`
-- [ ] **9.5** Implement `PATCH /orgs/:orgId/animals/:animalId` — update animal (allow client transfer within org) `P0`
-- [ ] **9.6** Implement `PATCH /orgs/:orgId/animals/:animalId/deceased` — mark animal as deceased `P0`
-- [ ] **9.7** Implement `GET /orgs/:orgId/clients/:clientId/animals` — list animals for a specific client `P0`
-- [ ] **9.8** Implement `DELETE /orgs/:orgId/animals/:animalId` — soft-delete animal with required reason; cascade to treatments; requires canDeleteAnimals permission `P0`
-- [ ] **9.9** Implement `POST /orgs/:orgId/animals/:animalId/restore` — restore soft-deleted animal (ADMIN+; fail if parent client is deleted) `P0`
-- [ ] **9.10** Create DTOs: CreateAnimalDto, UpdateAnimalDto, DeceasedAnimalDto, DeleteAnimalDto `P0`
+- [x] **9.1** Create `AnimalsModule` with `AnimalsController` and `AnimalsService` `P0`
+- [x] **9.2** Implement `POST /orgs/:orgId/animals` — register animal; validate clientId; microchip uniqueness; v1.1: patientType, batch fields, treatmentHistory `P0`
+- [x] **9.3** Implement `GET /orgs/:orgId/animals` — list animals with pagination, search, filter (exclude deleted by default) `P0`
+- [x] **9.4** Implement `GET /orgs/:orgId/animals/:animalId` — get animal detail with client info and treatment count `P0`
+- [x] **9.5** Implement `PATCH /orgs/:orgId/animals/:animalId` — update animal `P0`
+- [x] **9.6** Implement record death (e.g. PATCH/POST animals/:animalId/death) `P0`
+- [x] **9.7** List animals per client via GET animals with clientId filter or GET clients/:clientId/animals `P0`
+- [x] **9.8** Implement `DELETE /orgs/:orgId/animals/:animalId` — soft-delete with reason; cascade; canDeleteAnimals `P0`
+- [x] **9.9** Implement `POST /orgs/:orgId/animals/:animalId/restore` — restore (ADMIN+) `P0`
+- [x] **9.10** Create DTOs: CreateAnimalDto (v1.1: patientType, batchName/batchSize/batchIdentifier, treatmentHistory), UpdateAnimalDto, RecordDeathDto, DeleteAnimalDto `P0`
 - [ ] **9.11** Write unit tests for AnimalService `P0`
 - [ ] **9.12** Write integration tests for all animal endpoints `P0`
 
@@ -259,22 +262,23 @@ Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Shoul
 
 ## Epic 10: Medical Treatment Records
 
-> Create, version, view, soft-delete treatment records with permission.
+> Create, version, view, soft-delete treatment records with permission. **v1.1:** Payment tracking (amount, status, mark paid); scheduled treatments; list scheduled.
 
 ### Backend
 
-- [ ] **10.1** Create `TreatmentModule` with `TreatmentController` and `TreatmentService` `P0`
-- [ ] **10.2** Implement `POST /orgs/:orgId/treatments` — create treatment record; validate animalId; auto-set vetId, version 1, isLatestVersion `P0`
-- [ ] **10.3** Implement `GET /orgs/:orgId/treatments` — list treatments (latest versions only by default; support ?includeAllVersions=true) with pagination, search, sort, filter `P0`
-- [ ] **10.4** Implement `GET /orgs/:orgId/treatments/:treatmentId` — get treatment detail `P0`
-- [ ] **10.5** Implement `PUT /orgs/:orgId/treatments/:treatmentId` — update treatment (creates new version; sets old isLatestVersion=false; new record gets new UUID, incremented version) `P0`
-- [ ] **10.6** Implement `GET /orgs/:orgId/treatments/:treatmentId/history` — get all versions of a treatment ordered by version desc `P0`
-- [ ] **10.7** Implement `GET /orgs/:orgId/animals/:animalId/treatments` — treatment timeline for an animal `P0`
-- [ ] **10.8** Implement `DELETE /orgs/:orgId/treatments/:treatmentId` — soft-delete with required reason; delete entire version chain; requires canDeleteTreatments permission `P0`
-- [ ] **10.9** Implement `POST /orgs/:orgId/treatments/:treatmentId/restore` — restore soft-deleted treatment chain (ADMIN+; fail if parent animal is deleted) `P0`
-- [ ] **10.10** Create DTOs: CreateTreatmentDto, UpdateTreatmentDto, DeleteTreatmentDto `P0`
-- [ ] **10.11** Write unit tests for TreatmentService (versioning logic, cascade delete, restore) `P0`
-- [ ] **10.12** Write integration tests for all treatment endpoints `P0`
+- [x] **10.1** Create `TreatmentsModule` with `TreatmentsController` and `TreatmentsService` `P0`
+- [x] **10.2** Implement `POST /orgs/:orgId/treatments` — create treatment; validate animalId; version 1; v1.1: amount, paymentStatus, isScheduled, scheduledFor `P0`
+- [x] **10.3** Implement `GET /orgs/:orgId/treatments` — list treatments (latest versions); pagination, filters `P0`
+- [x] **10.4** Implement `GET /orgs/:orgId/treatments/:treatmentId` — get treatment detail `P0`
+- [x] **10.5** Implement `PATCH /orgs/:orgId/treatments/:treatmentId` — update (creates new version) `P0`
+- [x] **10.6** Implement `GET /orgs/:orgId/treatments/:treatmentId/versions` — get all versions `P0`
+- [x] **10.7** Implement `GET /orgs/:orgId/animals/:animalId/treatments` — treatment timeline for animal `P0`
+- [x] **10.8** Implement `DELETE /orgs/:orgId/treatments/:treatmentId` — soft-delete with reason; canDeleteTreatments `P0`
+- [x] **10.9** Implement `POST /orgs/:orgId/treatments/:treatmentId/restore` — restore (ADMIN+) `P0`
+- [x] **10.10** Create DTOs: CreateTreatmentDto, UpdateTreatmentDto, DeleteTreatmentDto, MarkPaymentDto (v1.1) `P0`
+- [x] **10.11** (v1.1) Implement `POST /orgs/:orgId/treatments/:treatmentId/payment` — mark payment; GET .../treatments/scheduled/list `P0`
+- [ ] **10.12** Write unit tests for TreatmentService `P0`
+- [ ] **10.13** Write integration tests for all treatment endpoints `P0`
 
 ### Frontend
 
@@ -453,6 +457,8 @@ Total estimated: ~8 weeks (1 full-stack developer)
 ---
 
 ## Task Counts Summary
+
+**Backend:** Epics 1–10 (core + v1.1) are largely implemented; see [BACKEND_TASKS.md](./BACKEND_TASKS.md) for detailed done/todo breakdown.
 
 | Epic | Name | Tasks | P0 | P1 | P2 |
 |------|------|-------|----|----|-----|

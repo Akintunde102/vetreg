@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
 import { DeleteTreatmentDto } from './dto/delete-treatment.dto';
+import { MarkPaymentDto } from './dto/mark-payment.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { ActivityLogService } from '../common/services/activity-log.service';
 
@@ -76,6 +77,12 @@ export class TreatmentsService {
         attachments: dto.attachments,
         notes: dto.notes,
         status: dto.status || 'COMPLETED',
+        isScheduled: dto.isScheduled || false,
+        scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null,
+        amount: dto.amount,
+        currency: dto.currency || 'NGN',
+        paymentStatus: dto.paymentStatus,
+        paymentNotes: dto.paymentNotes,
       },
     });
 
@@ -490,5 +497,114 @@ export class TreatmentsService {
     });
 
     return children.map((c) => c.id);
+  }
+
+  async markPayment(
+    organizationId: string,
+    treatmentId: string,
+    vetId: string,
+    dto: MarkPaymentDto,
+  ) {
+    const treatment = await this.findOne(organizationId, treatmentId);
+
+    if (treatment.isDeleted) {
+      throw new BadRequestException({
+        code: 'TREATMENT_DELETED',
+        message: 'Cannot update payment for deleted treatment',
+      });
+    }
+
+    const updatedTreatment = await this.prisma.treatmentRecord.update({
+      where: { id: treatmentId },
+      data: {
+        paymentStatus: dto.paymentStatus,
+        amountPaid: dto.amountPaid,
+        paymentNotes: dto.paymentNotes,
+        paidAt: dto.paymentStatus === 'PAID' ? new Date() : null,
+        paidBy: dto.paymentStatus === 'PAID' ? vetId : null,
+      },
+    });
+
+    await this.auditLogService.log({
+      vetId,
+      action: 'treatment.payment_updated',
+      entityType: 'treatment',
+      entityId: treatmentId,
+      metadata: {
+        organizationId,
+        paymentStatus: dto.paymentStatus,
+        amountPaid: dto.amountPaid,
+      },
+    });
+
+    await this.activityLogService.log({
+      organizationId,
+      vetId,
+      action: 'treatment.payment_updated',
+      entityType: 'treatment',
+      entityId: treatmentId,
+      description: `Payment status updated to ${dto.paymentStatus}`,
+    });
+
+    return updatedTreatment;
+  }
+
+  async getScheduledTreatments(
+    organizationId: string,
+    page: number = 1,
+    limit: number = 50,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      organizationId,
+      isDeleted: false,
+      isScheduled: true,
+      isLatestVersion: true,
+    };
+
+    const [treatments, total] = await Promise.all([
+      this.prisma.treatmentRecord.findMany({
+        where,
+        include: {
+          animal: {
+            select: {
+              id: true,
+              name: true,
+              species: true,
+              client: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  phoneNumber: true,
+                },
+              },
+            },
+          },
+          vet: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { scheduledFor: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.treatmentRecord.count({ where }),
+    ]);
+
+    return {
+      treatments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }

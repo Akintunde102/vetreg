@@ -7,8 +7,14 @@ import {
   IsObject,
   Min,
   MinLength,
+  IsBoolean,
 } from 'class-validator';
-import { TreatmentStatus, WeightUnit, TemperatureUnit } from '@prisma/client';
+import {
+  TreatmentStatus,
+  WeightUnit,
+  TemperatureUnit,
+  PaymentStatus,
+} from '@prisma/client';
 
 export class CreateTreatmentDto {
   @IsString()
@@ -105,4 +111,31 @@ export class CreateTreatmentDto {
   @IsEnum(TreatmentStatus)
   @IsOptional()
   status?: TreatmentStatus;
+
+  // Scheduling fields
+  @IsBoolean()
+  @IsOptional()
+  isScheduled?: boolean;
+
+  @IsDateString()
+  @IsOptional()
+  scheduledFor?: string;
+
+  // Payment tracking fields
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  amount?: number;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @IsEnum(PaymentStatus)
+  @IsOptional()
+  paymentStatus?: PaymentStatus;
+
+  @IsString()
+  @IsOptional()
+  paymentNotes?: string;
 }

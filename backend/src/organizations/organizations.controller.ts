@@ -18,8 +18,10 @@ import { ApprovalGuard } from '../auth/guards/approval.guard';
 import { OrgScopeGuard } from '../auth/guards/org-scope.guard';
 import { RoleGuard } from '../auth/guards/role.guard';
 import { ActivityLogPermissionGuard } from '../auth/guards/activity-log-permission.guard';
+import { MasterAdminGuard } from '../auth/guards/master-admin.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { SkipApproval } from '../auth/decorators/skip-approval.decorator';
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
@@ -69,5 +71,70 @@ export class OrganizationsController {
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
     return this.organizationsService.getActivityLogs(orgId, page, limit);
+  }
+
+  // Master Admin endpoints for organization approval
+  @Get('admin/pending-approvals')
+  @SkipApproval()
+  @UseGuards(MasterAdminGuard)
+  async getPendingApprovals() {
+    return this.organizationsService.getPendingApprovals();
+  }
+
+  @Post('admin/:orgId/approve')
+  @SkipApproval()
+  @UseGuards(MasterAdminGuard)
+  async approveOrganization(
+    @Param('orgId') orgId: string,
+    @CurrentUser() admin: Vet,
+  ) {
+    return this.organizationsService.approveOrganization(admin.id, orgId);
+  }
+
+  @Post('admin/:orgId/reject')
+  @SkipApproval()
+  @UseGuards(MasterAdminGuard)
+  async rejectOrganization(
+    @Param('orgId') orgId: string,
+    @CurrentUser() admin: Vet,
+    @Body('reason') reason: string,
+  ) {
+    return this.organizationsService.rejectOrganization(
+      admin.id,
+      orgId,
+      reason,
+    );
+  }
+
+  @Post('admin/:orgId/suspend')
+  @SkipApproval()
+  @UseGuards(MasterAdminGuard)
+  async suspendOrganization(
+    @Param('orgId') orgId: string,
+    @CurrentUser() admin: Vet,
+    @Body('reason') reason: string,
+  ) {
+    return this.organizationsService.suspendOrganization(
+      admin.id,
+      orgId,
+      reason,
+    );
+  }
+
+  @Post('admin/:orgId/reactivate')
+  @SkipApproval()
+  @UseGuards(MasterAdminGuard)
+  async reactivateOrganization(
+    @Param('orgId') orgId: string,
+    @CurrentUser() admin: Vet,
+  ) {
+    return this.organizationsService.reactivateOrganization(admin.id, orgId);
+  }
+
+  @Get(':orgId/revenue')
+  @UseGuards(OrgScopeGuard, RoleGuard)
+  @Roles(MembershipRole.OWNER, MembershipRole.ADMIN)
+  async getRevenue(@Param('orgId') orgId: string) {
+    return this.organizationsService.getRevenue(orgId);
   }
 }

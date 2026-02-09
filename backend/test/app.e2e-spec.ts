@@ -16,10 +16,38 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
+  afterEach(async () => {
+    await app.close();
+  });
+
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
+      .expect((res) => {
+        const body = res.body;
+        expect(body.success).toBe(true);
+        expect(body.data).toBe('Hello World!');
+        expect(body.meta).toBeDefined();
+        expect(body.meta.timestamp).toBeDefined();
+        expect(body.meta.requestId).toBeDefined();
+      });
+  });
+
+  it('/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect((res) => {
+        const body = res.body;
+        expect(body.success).toBe(true);
+        expect(body.data).toEqual(
+          expect.objectContaining({
+            status: 'ok',
+            service: 'vet-reg-backend',
+            timestamp: expect.any(String),
+          }),
+        );
+      });
   });
 });

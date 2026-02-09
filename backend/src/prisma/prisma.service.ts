@@ -1,4 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
@@ -6,6 +9,20 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  constructor(configService: ConfigService) {
+    const url = configService.get<string>('database.url');
+    let adapter;
+    if (url) {
+      const connectionString = url.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '') || url;
+      const pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+      });
+      adapter = new PrismaPg(pool);
+    }
+    super(adapter ? { adapter } : ({} as never));
+  }
+
   async onModuleInit() {
     await this.$connect();
   }

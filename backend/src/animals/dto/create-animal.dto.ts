@@ -8,8 +8,38 @@ import {
   MinLength,
   MaxLength,
   Min,
+  IsArray,
+  ValidateNested,
+  IsInt,
 } from 'class-validator';
-import { AnimalSpecies, AnimalGender, WeightUnit } from '@prisma/client';
+import { Type } from 'class-transformer';
+import {
+  AnimalSpecies,
+  AnimalGender,
+  WeightUnit,
+  PatientType,
+} from '@prisma/client';
+
+export class TreatmentHistoryDto {
+  @IsDateString()
+  visitDate!: string;
+
+  @IsString()
+  @MinLength(10)
+  chiefComplaint!: string;
+
+  @IsString()
+  @IsOptional()
+  diagnosis?: string;
+
+  @IsString()
+  @MinLength(10)
+  treatmentGiven!: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
 
 export class CreateAnimalDto {
   @IsString()
@@ -67,4 +97,30 @@ export class CreateAnimalDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  // Patient Type
+  @IsEnum(PatientType)
+  @IsOptional()
+  patientType?: PatientType;
+
+  // Batch Livestock fields
+  @IsString()
+  @IsOptional()
+  batchName?: string;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  batchSize?: number;
+
+  @IsString()
+  @IsOptional()
+  batchIdentifier?: string;
+
+  // Treatment history backlog for livestock
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TreatmentHistoryDto)
+  @IsOptional()
+  treatmentHistory?: TreatmentHistoryDto[];
 }

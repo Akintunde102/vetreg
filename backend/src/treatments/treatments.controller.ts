@@ -16,6 +16,7 @@ import { TreatmentsService } from './treatments.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
 import { DeleteTreatmentDto } from './dto/delete-treatment.dto';
+import { MarkPaymentDto } from './dto/mark-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApprovalGuard } from '../auth/guards/approval.guard';
 import { OrgScopeGuard } from '../auth/guards/org-scope.guard';
@@ -111,5 +112,24 @@ export class TreatmentsController {
     @Param('treatmentId') treatmentId: string,
   ) {
     return this.treatmentsService.getVersions(orgId, treatmentId);
+  }
+
+  @Post(':treatmentId/payment')
+  async markPayment(
+    @Param('orgId') orgId: string,
+    @Param('treatmentId') treatmentId: string,
+    @CurrentUser() user: Vet,
+    @Body() dto: MarkPaymentDto,
+  ) {
+    return this.treatmentsService.markPayment(orgId, treatmentId, user.id, dto);
+  }
+
+  @Get('scheduled/list')
+  async getScheduledTreatments(
+    @Param('orgId') orgId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.treatmentsService.getScheduledTreatments(orgId, page, limit);
   }
 }
