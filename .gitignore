@@ -40,6 +40,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Backend build artifacts
+backend/backend@*
+backend/jest
+
 # Misc
 .cache/
 .parcel-cache/
