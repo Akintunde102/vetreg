@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { VetsService } from './vets.service';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -16,6 +17,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { SkipApproval } from '../auth/decorators/skip-approval.decorator';
 import type { Vet } from '@prisma/client';
 
+@ApiTags('Vets')
+@ApiBearerAuth('access-token')
 @Controller('vets')
 @UseGuards(JwtAuthGuard)
 export class VetsController {

@@ -12,6 +12,7 @@ import {
   DefaultValuePipe,
   ParseBoolPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AnimalsService } from './animals.service';
 import { CreateAnimalDto } from './dto/create-animal.dto';
 import { UpdateAnimalDto } from './dto/update-animal.dto';
@@ -28,6 +29,8 @@ import { RequireDeletePermission } from '../auth/decorators/delete-permission.de
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
+@ApiTags('Animals')
+@ApiBearerAuth('access-token')
 @Controller('orgs/:orgId/animals')
 @UseGuards(JwtAuthGuard, ApprovalGuard, OrgScopeGuard)
 export class AnimalsController {

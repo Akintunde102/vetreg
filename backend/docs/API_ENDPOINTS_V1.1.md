@@ -5,6 +5,8 @@ Complete API reference for the Veterinary Registration & Practice Management Pla
 **Base URL:** `http://localhost:3000/api/v1`  
 **Authentication:** Bearer token (Supabase JWT) in Authorization header
 
+**Interactive API docs (Scalar):** When the backend is running, open [http://localhost:3001/docs](http://localhost:3001/docs) for a live, try-it-out API reference.
+
 ---
 
 ## Authentication

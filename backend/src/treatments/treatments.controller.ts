@@ -12,6 +12,7 @@ import {
   DefaultValuePipe,
   ParseBoolPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TreatmentsService } from './treatments.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
@@ -28,6 +29,8 @@ import { RequireDeletePermission } from '../auth/decorators/delete-permission.de
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
+@ApiTags('Treatments')
+@ApiBearerAuth('access-token')
 @Controller('orgs/:orgId/treatments')
 @UseGuards(JwtAuthGuard, ApprovalGuard, OrgScopeGuard)
 export class TreatmentsController {

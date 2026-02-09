@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -25,6 +26,8 @@ import { SkipApproval } from '../auth/decorators/skip-approval.decorator';
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
+@ApiTags('Organizations')
+@ApiBearerAuth('access-token')
 @Controller('orgs')
 @UseGuards(JwtAuthGuard, ApprovalGuard)
 export class OrganizationsController {

@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { MembershipsService } from './memberships.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
@@ -21,6 +22,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
+@ApiTags('Memberships')
+@ApiBearerAuth('access-token')
 @Controller()
 @UseGuards(JwtAuthGuard, ApprovalGuard)
 export class MembershipsController {
