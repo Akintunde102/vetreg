@@ -9,11 +9,13 @@ import {
   UseGuards,
   ParseIntPipe,
   DefaultValuePipe,
+  HttpCode,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { GetRevenueQueryDto } from './dto/get-revenue-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApprovalGuard } from '../auth/guards/approval.guard';
 import { OrgScopeGuard } from '../auth/guards/org-scope.guard';
@@ -23,6 +25,7 @@ import { MasterAdminGuard } from '../auth/guards/master-admin.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { SkipApproval } from '../auth/decorators/skip-approval.decorator';
+import { SkipResponseTransform } from '../common/decorators/skip-response-transform.decorator';
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
@@ -85,16 +88,21 @@ export class OrganizationsController {
   }
 
   @Post('admin/:orgId/approve')
+  @HttpCode(200)
+  @SkipResponseTransform()
   @SkipApproval()
   @UseGuards(MasterAdminGuard)
   async approveOrganization(
     @Param('orgId') orgId: string,
     @CurrentUser() admin: Vet,
   ) {
-    return this.organizationsService.approveOrganization(admin.id, orgId);
+    const org = await this.organizationsService.approveOrganization(admin.id, orgId);
+    return { success: true, data: org };
   }
 
   @Post('admin/:orgId/reject')
+  @HttpCode(200)
+  @SkipResponseTransform()
   @SkipApproval()
   @UseGuards(MasterAdminGuard)
   async rejectOrganization(
@@ -102,14 +110,17 @@ export class OrganizationsController {
     @CurrentUser() admin: Vet,
     @Body('reason') reason: string,
   ) {
-    return this.organizationsService.rejectOrganization(
+    const org = await this.organizationsService.rejectOrganization(
       admin.id,
       orgId,
       reason,
     );
+    return { success: true, data: org };
   }
 
   @Post('admin/:orgId/suspend')
+  @HttpCode(200)
+  @SkipResponseTransform()
   @SkipApproval()
   @UseGuards(MasterAdminGuard)
   async suspendOrganization(
@@ -117,27 +128,41 @@ export class OrganizationsController {
     @CurrentUser() admin: Vet,
     @Body('reason') reason: string,
   ) {
-    return this.organizationsService.suspendOrganization(
+    const org = await this.organizationsService.suspendOrganization(
       admin.id,
       orgId,
       reason,
     );
+    return { success: true, data: org };
   }
 
   @Post('admin/:orgId/reactivate')
+  @HttpCode(200)
+  @SkipResponseTransform()
   @SkipApproval()
   @UseGuards(MasterAdminGuard)
   async reactivateOrganization(
     @Param('orgId') orgId: string,
     @CurrentUser() admin: Vet,
   ) {
-    return this.organizationsService.reactivateOrganization(admin.id, orgId);
+    const org = await this.organizationsService.reactivateOrganization(admin.id, orgId);
+    return { success: true, data: org };
   }
 
   @Get(':orgId/revenue')
   @UseGuards(OrgScopeGuard, RoleGuard)
   @Roles(MembershipRole.OWNER, MembershipRole.ADMIN)
-  async getRevenue(@Param('orgId') orgId: string) {
-    return this.organizationsService.getRevenue(orgId);
+  async getRevenue(
+    @Param('orgId') orgId: string,
+    @Query() query: GetRevenueQueryDto,
+  ) {
+    return this.organizationsService.getRevenue(orgId, query);
+  }
+
+  @Get(':orgId/dashboard/stats')
+  @SkipResponseTransform()
+  @UseGuards(OrgScopeGuard)
+  async getDashboardStats(@Param('orgId') orgId: string) {
+    return this.organizationsService.getDashboardStats(orgId);
   }
 }

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { GetRevenueQueryDto } from './dto/get-revenue-query.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { ActivityLogService } from '../common/services/activity-log.service';
 import { MembershipRole, MembershipStatus, OrgStatus } from '@prisma/client';
@@ -55,6 +56,7 @@ export class OrganizationsService {
         email: dto.email,
         website: dto.website,
         type: dto.type,
+        paymentTerms: dto.paymentTerms,
         createdBy: vetId,
       },
     });
@@ -188,6 +190,7 @@ export class OrganizationsService {
         website: dto.website,
         type: dto.type,
         isActive: dto.isActive,
+        paymentTerms: dto.paymentTerms,
       },
     });
 
@@ -476,12 +479,25 @@ export class OrganizationsService {
     return updatedOrg;
   }
 
-  async getRevenue(orgId: string) {
+  async getRevenue(orgId: string, query?: GetRevenueQueryDto) {
+    const dateFilter: any = {};
+    
+    if (query?.fromDate || query?.toDate) {
+      dateFilter.visitDate = {};
+      if (query.fromDate) {
+        dateFilter.visitDate.gte = new Date(query.fromDate);
+      }
+      if (query.toDate) {
+        dateFilter.visitDate.lte = new Date(query.toDate);
+      }
+    }
+
     const revenue = await this.prisma.treatmentRecord.aggregate({
       where: {
         organizationId: orgId,
         isDeleted: false,
         amount: { not: null },
+        ...dateFilter,
       },
       _sum: {
         amount: true,
@@ -498,6 +514,7 @@ export class OrganizationsService {
         organizationId: orgId,
         isDeleted: false,
         paymentStatus: { not: null },
+        ...dateFilter,
       },
       _sum: {
         amount: true,
@@ -523,6 +540,207 @@ export class OrganizationsService {
         totalAmount: item._sum.amount?.toString() || '0',
         amountPaid: item._sum.amountPaid?.toString() || '0',
       })),
+    };
+  }
+
+  async getDashboardStats(orgId: string) {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Fetch all data in parallel
+    const [
+      clientStats,
+      animalStats,
+      animalsByPatientType,
+      animalsBySpecies,
+      treatmentStats,
+      treatmentsThisMonth,
+      scheduledTreatments,
+      followUpsDue,
+      revenueStats,
+      paymentBreakdown,
+    ] = await Promise.all([
+      // Clients
+      this.prisma.client.groupBy({
+        by: ['isActive'],
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+        },
+        _count: true,
+      }),
+
+      // Animals - total count
+      this.prisma.animal.count({
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+        },
+      }),
+
+      // Animals by patient type
+      this.prisma.animal.groupBy({
+        by: ['patientType'],
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+        },
+        _count: true,
+      }),
+
+      // Animals by species
+      this.prisma.animal.groupBy({
+        by: ['species'],
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+        },
+        _count: true,
+      }),
+
+      // Treatments - total count
+      this.prisma.treatmentRecord.count({
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+          isLatestVersion: true,
+        },
+      }),
+
+      // Treatments this month
+      this.prisma.treatmentRecord.count({
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+          isLatestVersion: true,
+          visitDate: {
+            gte: startOfMonth,
+          },
+        },
+      }),
+
+      // Scheduled treatments (unsettled)
+      this.prisma.treatmentRecord.count({
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+          isScheduled: true,
+          status: {
+            not: 'COMPLETED',
+          },
+        },
+      }),
+
+      // Follow-ups due today
+      this.prisma.treatmentRecord.count({
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+          followUpDate: {
+            gte: today,
+            lte: endOfToday,
+          },
+        },
+      }),
+
+      // Revenue - aggregate
+      this.prisma.treatmentRecord.aggregate({
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+          amount: { not: null },
+        },
+        _sum: {
+          amount: true,
+          amountPaid: true,
+        },
+      }),
+
+      // Payment breakdown
+      this.prisma.treatmentRecord.groupBy({
+        by: ['paymentStatus'],
+        where: {
+          organizationId: orgId,
+          isDeleted: false,
+          paymentStatus: { not: null },
+        },
+        _sum: {
+          amount: true,
+        },
+        _count: true,
+      }),
+    ]);
+
+    // Process client stats
+    const clientsActive =
+      clientStats.find((c) => c.isActive)?._count || 0;
+    const clientsInactive =
+      clientStats.find((c) => !c.isActive)?._count || 0;
+
+    // Process animal stats by patient type
+    const animalsByType = {
+      SINGLE_PET: 0,
+      SINGLE_LIVESTOCK: 0,
+      BATCH_LIVESTOCK: 0,
+    };
+    animalsByPatientType.forEach((item) => {
+      animalsByType[item.patientType] = item._count;
+    });
+
+    // Process animal stats by species
+    const speciesMap: Record<string, number> = {};
+    animalsBySpecies.forEach((item) => {
+      speciesMap[item.species] = item._count;
+    });
+
+    // Process revenue stats
+    const totalRevenue = Number(revenueStats._sum.amount || 0);
+    const totalPaid = Number(revenueStats._sum.amountPaid || 0);
+    const totalOwed = totalRevenue - totalPaid;
+
+    const owedBreakdown = paymentBreakdown.find((p) => p.paymentStatus === 'OWED');
+    const waivedBreakdown = paymentBreakdown.find((p) => p.paymentStatus === 'WAIVED');
+
+    const totalWaived = Number(waivedBreakdown?._sum.amount || 0);
+    const unpaidInvoices = owedBreakdown?._count || 0;
+
+    // TODO: Implement vaccination due calculation
+    // This would require querying treatment records for vaccination history
+    // For now, return 0
+    const vaccinationDue = 0;
+
+    return {
+      clients: {
+        total: clientsActive + clientsInactive,
+        active: clientsActive,
+        inactive: clientsInactive,
+      },
+      animals: {
+        total: animalStats,
+        byPatientType: animalsByType,
+        bySpecies: speciesMap,
+        vaccinationDue,
+      },
+      treatments: {
+        total: treatmentStats,
+        thisMonth: treatmentsThisMonth,
+        scheduled: scheduledTreatments,
+        followUpsDue: followUpsDue,
+      },
+      revenue: {
+        total: totalRevenue,
+        totalPaid,
+        totalOwed,
+        totalWaived,
+        unpaidInvoices,
+      },
     };
   }
 }
