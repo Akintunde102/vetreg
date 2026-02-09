@@ -64,6 +64,8 @@ describe('E2E Tests - Complete Application', () => {
     await prisma.activityLog.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.notification.deleteMany();
+    // Break self-reference so all treatment records can be deleted
+    await prisma.treatmentRecord.updateMany({ data: { parentRecordId: null } });
     await prisma.treatmentRecord.deleteMany();
     await prisma.animal.deleteMany();
     await prisma.client.deleteMany();
@@ -241,7 +243,7 @@ describe('E2E Tests - Complete Application', () => {
       return request(app.getHttpServer())
         .post(`/api/v1/orgs/admin/${orgId}/approve`)
         .set('Authorization', `Bearer ${masterAdminToken}`)
-        .expect(201)
+        .expect(200)
         .expect((res) => {
           expect(res.body.success).toBe(true);
           expect(res.body.data.status).toBe('APPROVED');

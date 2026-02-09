@@ -1,5 +1,12 @@
 # E2E Manual Test Guide
 
+## Test Suites Available
+
+1. **app.e2e-spec.ts** - Basic health check and welcome endpoint
+2. **e2e-automated.e2e-spec.ts** - Complete application workflow tests
+3. **e2e-deep-scenarios.e2e-spec.ts** - Deep scenario and integration tests
+4. **p0-features.e2e-spec.ts** - P0 backend features (Dashboard stats, date filtering, payment categories)
+
 ## Prerequisites
 
 1. **Supabase Database must be active**
@@ -477,6 +484,106 @@ All workflows should complete without errors, and:
 - ✅ Data integrity maintained
 - ✅ No orphaned records
 - ✅ Response format consistent
+
+---
+
+## P0 Features Test Suite (test/p0-features.e2e-spec.ts)
+
+### Running P0 Tests
+
+```bash
+# Run P0 feature tests only
+npm run test:e2e test/p0-features.e2e-spec.ts
+
+# Run all e2e tests including P0
+npm run test:e2e
+```
+
+### P0 Features Covered
+
+1. **Organization paymentTerms Field**
+   - Create organization with paymentTerms
+   - Update paymentTerms
+   - Get organization with paymentTerms
+
+2. **Date Range Filtering on Revenue**
+   - Filter by specific date range
+   - Filter by today only
+   - Filter by last month
+   - Handle empty results for future dates
+
+3. **Payment Category Filter on Treatments**
+   - Filter by PET category (SINGLE_PET)
+   - Filter by LIVESTOCK category (SINGLE_LIVESTOCK)
+   - Filter by FARM category (BATCH_LIVESTOCK)
+   - Combine with paymentStatus filter
+
+4. **Dashboard Statistics Endpoint**
+   - Get complete dashboard stats
+   - Verify client counts (active/inactive)
+   - Verify animal counts by patient type
+   - Verify treatment counts (total, this month, scheduled, follow-ups)
+   - Verify revenue breakdown (total, paid, owed, waived)
+
+5. **Scheduled Treatments for Today**
+   - Get all scheduled treatments for current day
+   - Verify animal and client details included
+   - Verify proper date filtering
+   - Verify ordering by time
+
+6. **Follow-ups Due Today**
+   - Get all follow-ups due today
+   - Verify proper date filtering
+   - Verify included details
+
+### Manual Testing P0 Endpoints
+
+```bash
+# 1. Dashboard Stats
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3001/api/v1/orgs/{orgId}/dashboard/stats
+
+# 2. Scheduled Today
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3001/api/v1/orgs/{orgId}/treatments/scheduled/today
+
+# 3. Follow-ups Today
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3001/api/v1/orgs/{orgId}/treatments/follow-ups/today
+
+# 4. Revenue with Date Range
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3001/api/v1/orgs/{orgId}/revenue?fromDate=2024-01-01&toDate=2024-12-31"
+
+# 5. Filter Treatments by Category
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3001/api/v1/orgs/{orgId}/treatments?paymentCategory=PET&paymentStatus=OWED"
+```
+
+### Expected Test Results
+
+- **Total Test Suites**: 4 (app, e2e-automated, e2e-deep-scenarios, p0-features)
+- **P0 Test Cases**: 47 tests covering all P0 features
+- **Coverage**: All new endpoints and enhanced features
+
+### Test Data Requirements
+
+The P0 test suite creates its own test data including:
+- 3 vets (OWNER, ADMIN, MEMBER) with proper permissions
+- 1 organization with approved status and paymentTerms
+- 1 client
+- 3 animals (1 PET, 1 LIVESTOCK, 1 FARM BATCH)
+- Multiple treatments with different payment statuses
+- Scheduled treatments for today
+- Follow-ups due today
+
+---
+
+## Documentation References
+
+- **Error Codes**: See `docs/backend/ERROR_CODE_CATALOG.md`
+- **P0 Implementation**: See `docs/backend/P0_IMPLEMENTATION_SUMMARY.md`
+- **API-Frontend Mapping**: See `docs/frontend/API_FRONTEND_MAPPING.md`
 
 ---
 

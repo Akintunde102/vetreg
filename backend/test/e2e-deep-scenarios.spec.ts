@@ -87,6 +87,7 @@ describe('Deep E2E Scenarios - Real-World Workflows', () => {
     await prisma.activityLog.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.notification.deleteMany();
+    await prisma.treatmentRecord.updateMany({ data: { parentRecordId: null } });
     await prisma.treatmentRecord.deleteMany();
     await prisma.animal.deleteMany();
     await prisma.client.deleteMany();
