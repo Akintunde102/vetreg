@@ -23,7 +23,7 @@ Fully implemented in a single session:
 
 ### **Testing Framework: 124+ Test Cases**
 
-- ✅ **Automated E2E test suite** (`test/e2e-automated.spec.ts`)
+- ✅ **Automated E2E test suite** (`test/e2e-automated.e2e-spec.ts`)
 - ✅ **Manual test guide** with curl commands for all endpoints
 - ✅ **Verification script** (validates code without database)
 - ✅ **Test documentation** (3 comprehensive guides)
@@ -91,7 +91,7 @@ Plus: `MasterAdminGuard` for platform admin operations
 ### 4. Complete Testing Framework
 
 **Test Files Created**:
-- `test/e2e-automated.spec.ts` - 124+ automated test cases
+- `test/e2e-automated.e2e-spec.ts` - 124+ automated test cases
 - `test/e2e-manual-test-guide.md` - Comprehensive manual testing guide
 - `backend/TEST_SUMMARY.md` - Test execution summary
 - `backend/scripts/verify-implementation.ts` - Structural verification
@@ -452,7 +452,7 @@ git push -u origin main
 - `TESTING_INSTRUCTIONS.md` - Supabase setup & test execution
 - `backend/TEST_SUMMARY.md` - Test strategy & coverage
 - `backend/test/e2e-manual-test-guide.md` - Manual test procedures
-- `backend/test/e2e-automated.spec.ts` - Automated test suite
+- `backend/test/e2e-automated.e2e-spec.ts` - Automated test suite
 
 ### Requirements
 - `docs/PRD.md` - Product Requirements Document (v1.1.0)

@@ -130,7 +130,7 @@ npm run test:e2e
 npm run test:e2e -- --verbose
 
 # Run specific test
-npm run test:e2e test/e2e-automated.spec.ts
+npm run test:e2e test/e2e-automated.e2e-spec.ts
 ```
 
 #### **Option B: Manual Testing**
@@ -317,7 +317,7 @@ Before marking testing as complete:
 
 - **Test Summary**: `backend/TEST_SUMMARY.md`
 - **Manual Test Guide**: `backend/test/e2e-manual-test-guide.md`
-- **Automated Tests**: `backend/test/e2e-automated.spec.ts`
+- **Automated Tests**: `backend/test/e2e-automated.e2e-spec.ts`
 - **Backend README**: `backend/README.md`
 - **PRD**: `docs/PRD.md`
 

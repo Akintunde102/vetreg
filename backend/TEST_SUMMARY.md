@@ -40,7 +40,7 @@ db.blyhaayyzwvcdyrkejgr.supabase.co:5432 - Network unreachable
 
 | File | Status | Purpose |
 |------|--------|---------|
-| `test/e2e-automated.spec.ts` | ✅ Created | Automated E2E test suite |
+| `test/e2e-automated.e2e-spec.ts` | ✅ Created | Automated E2E test suite |
 | `test/e2e-manual-test-guide.md` | ✅ Created | Manual testing procedures |
 | `test/TEST_SUMMARY.md` | ✅ Created | This document |
 | `test/app.e2e-spec.ts` | ✅ Exists | Basic E2E template |
@@ -306,7 +306,7 @@ cd /home/glory/vet-reg/backend
 npm run test:e2e
 
 # Run specific test file
-npm run test:e2e -- test/e2e-automated.spec.ts
+npm run test:e2e -- test/e2e-automated.e2e-spec.ts
 
 # Run with coverage
 npm run test:e2e -- --coverage
@@ -473,7 +473,7 @@ npm run test:cov
 ## 📚 Resources
 
 - **Manual Test Guide**: `test/e2e-manual-test-guide.md`
-- **Automated Tests**: `test/e2e-automated.spec.ts`
+- **Automated Tests**: `test/e2e-automated.e2e-spec.ts`
 - **Prisma Schema**: `prisma/schema.prisma`
 - **API Docs**: `backend/README.md`
 - **PRD**: `docs/PRD.md`

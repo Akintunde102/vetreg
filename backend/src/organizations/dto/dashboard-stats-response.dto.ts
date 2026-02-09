@@ -1,11 +1,11 @@
 export class DashboardStatsResponseDto {
-  clients: {
+  clients!: {
     total: number;
     active: number;
     inactive: number;
   };
 
-  animals: {
+  animals!: {
     total: number;
     byPatientType: {
       SINGLE_PET: number;
@@ -16,14 +16,14 @@ export class DashboardStatsResponseDto {
     vaccinationDue: number;
   };
 
-  treatments: {
+  treatments!: {
     total: number;
     thisMonth: number;
     scheduled: number;
     followUpsDue: number;
   };
 
-  revenue: {
+  revenue!: {
     total: number;
     totalPaid: number;
     totalOwed: number;
