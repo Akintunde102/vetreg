@@ -1,6 +1,6 @@
 # Backend API Changes & Additions
 
-**Version:** 1.0.0  
+**Version:** 1.2.0  
 **Last Updated:** February 9, 2026  
 **Priority:** Based on frontend design requirements
 
@@ -770,18 +770,20 @@ async findAll() {
 
 ## Implementation Priority
 
-### Phase 1: Critical (Week 1) - P0
+### Phase 1: Critical (Week 1) - P0 ✅ **COMPLETED (Feb 9, 2026)**
 
 Must be completed for MVP frontend:
 
-1. ✅ Add `paymentTerms` to Organization model
-2. ✅ Add date range to `/orgs/:orgId/revenue`
-3. ✅ Add payment category filter to `/orgs/:orgId/treatments`
-4. ✅ Create `/orgs/:orgId/dashboard/stats` endpoint
-5. ✅ Create `/orgs/:orgId/treatments/scheduled/today` endpoint
-6. ✅ Create `/orgs/:orgId/treatments/follow-ups/today` endpoint
+1. ✅ Add `paymentTerms` to Organization model **[DONE]**
+2. ✅ Add date range to `/orgs/:orgId/revenue` **[DONE]**
+3. ✅ Add payment category filter to `/orgs/:orgId/treatments` **[DONE]**
+4. ✅ Create `/orgs/:orgId/dashboard/stats` endpoint **[DONE]**
+5. ✅ Create `/orgs/:orgId/treatments/scheduled/today` endpoint **[DONE]**
+6. ✅ Create `/orgs/:orgId/treatments/follow-ups/today` endpoint **[DONE]**
 
-**Estimated Time:** 2-3 days
+**Status:** ✅ All items completed and tested
+**Tests:** See `test/p0-features.e2e-spec.ts` (47 test cases)
+**Documentation:** See `docs/backend/P0_IMPLEMENTATION_SUMMARY.md`
 
 ---
 
@@ -935,3 +937,4 @@ async getDashboardStats(@Param('orgId') orgId: string) {
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | Feb 9, 2026 | Initial backend API changes proposal |
+| 1.2.0 | Feb 9, 2026 | P0 implementation complete; Phase 1 all items done; 47 P0 e2e tests |

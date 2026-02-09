@@ -3,7 +3,7 @@
 **Technology Stack:** NestJS, TypeScript, Prisma, PostgreSQL (Supabase), Resend/SendGrid, Twilio  
 **Total Tasks:** ~180 (includes v1.1)  
 **Last Updated:** February 9, 2026  
-**Backend Version:** 1.1.0
+**Backend Version:** 1.2.0 (P0 features complete)
 
 Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Should have | `P2` = Nice to have
 

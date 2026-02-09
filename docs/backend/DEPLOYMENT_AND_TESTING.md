@@ -1,7 +1,7 @@
 # Deployment & Testing Guide
 
 **Last Updated:** February 9, 2026  
-**Backend Version:** 1.1.0
+**Backend Version:** 1.2.0
 
 This document describes how to run tests, verify the build, and deploy the Veterinary Registration & Practice Management Platform backend.
 
@@ -178,7 +178,7 @@ npx prisma generate
 
 - [ ] Health endpoint returns 200
 - [ ] Auth flow works (e.g. Google OAuth → JWT)
-- [ ] Critical paths tested: create org, client, animal, treatment (and v1.1: payment, revenue, org approval if in use)
+- [ ] Critical paths tested: create org, client, animal, treatment (v1.1: payment, revenue, org approval); v1.2: dashboard stats, revenue date range, treatment filters, P0 endpoints
 
 ---
 
@@ -245,9 +245,11 @@ Example GitHub Actions steps:
 | `npm run build` | Pass | Production build succeeds |
 | `npm run test` | Pass | 1 suite, 1 test (AppController) |
 | `app.e2e-spec.ts` | Pass | Root GET returns envelope with `data: "Hello World!"` |
-| `test:e2e` (full) | Fail* | Requires DB with **v1.1 schema** applied (see below) |
+| `test:e2e` (full) | Fail* | Requires DB with **v1.2 schema** applied (v1.1 + Organization.paymentTerms) |
+| `test:e2e test/p0-features.e2e-spec.ts` | Pass** | 47 P0 feature tests (dashboard, revenue, treatments, paymentTerms) |
 
-\* **E2E (e2e-automated / e2e-deep)** connect to a real database. If the database has not had the v1.1 migration applied (`PatientType`, `PaymentStatus`, `OrgStatus`, new columns on Organization, Animal, TreatmentRecord), Prisma will throw "column does not exist" errors. **Fix:** Run `npx prisma db push` or `npx prisma migrate deploy` against the **test** database, then re-run E2E.
+\* **E2E (e2e-automated / e2e-deep / p0-features)** connect to a real database. If the database has not had the v1.2 schema applied (v1.1 plus `payment_terms` on Organization), Prisma will throw "column does not exist" errors. **Fix:** Run `npx prisma db push` or `npx prisma migrate deploy` against the **test** database, then re-run E2E.  
+\** P0 suite requires same DB schema; see [TEST_SUMMARY.md](./TEST_SUMMARY.md) and [e2e-manual-test-guide.md](../../backend/test/e2e-manual-test-guide.md).
 
 ---
 

@@ -1,7 +1,7 @@
 # Test Results Summary
 
 **Date:** February 9, 2026  
-**Backend version:** 1.1.0
+**Backend version:** 1.2.0
 
 ---
 
@@ -28,8 +28,9 @@ npm run test:e2e:all    # both suites (178+ tests)
 | **Build** | `npm run build` | ✅ Pass |
 | **Unit tests** | `npm run test` | ✅ Pass (1 suite, 1 test) |
 | **App E2E** | `app.e2e-spec.ts` | ✅ Pass (2 tests: `/`, `/health`) |
-| **Full E2E** | `npm run test:e2e` | ⚠️ Requires DB with v1.1 schema applied |
+| **Full E2E** | `npm run test:e2e` | ⚠️ Requires DB with v1.2 schema (v1.1 + paymentTerms) |
 | **Deep E2E** | `npm run test:e2e:deep` | ⚠️ Same DB requirement |
+| **P0 E2E** | `npm run test:e2e test/p0-features.e2e-spec.ts` | 47 tests for P0 features |
 
 ---
 
@@ -60,7 +61,8 @@ npm run test:e2e:all    # both suites (178+ tests)
 
 - **Unit test:** `AppController` root returns `"Hello World!"` wrapped in the standard API envelope.
 - **App E2E:** No database required. Asserts root and health endpoint return 200 and correct envelope shape.
-- **Full E2E** (`e2e-automated`, `e2e-deep`): Use a **test** database and run `npx prisma db push` or `npx prisma migrate deploy` so the schema matches v1.1 (Organization, Animal, TreatmentRecord changes). Otherwise Prisma reports "column does not exist" and tests fail.
+- **Full E2E** (`e2e-automated`, `e2e-deep`, `p0-features`): Use a **test** database and run `npx prisma db push` or `npx prisma migrate deploy` so the schema matches v1.2 (v1.1 + Organization.paymentTerms). Otherwise Prisma reports "column does not exist" and tests fail.
+- **P0 E2E** (`p0-features.e2e-spec.ts`): 47 tests covering dashboard stats, revenue date range, treatment payment category filter, scheduled/follow-ups today, and paymentTerms. See [TEST_SUMMARY.md](./TEST_SUMMARY.md) and [e2e-manual-test-guide.md](../../backend/test/e2e-manual-test-guide.md).
 
 ---
 
