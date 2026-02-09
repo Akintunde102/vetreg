@@ -131,10 +131,12 @@ if (!profile.profileCompleted) {
 | API | Purpose | Frequency |
 |-----|---------|-----------|
 | `GET /orgs` | Get all organizations user belongs to | On load |
-| `GET /orgs/:orgId/dashboard/stats` ✨ **NEW** | Get all dashboard statistics in one call | On org switch |
-| `GET /orgs/:orgId/revenue` | Get revenue stats (supports date range) | On org switch |
-| `GET /orgs/:orgId/treatments/scheduled/today` ✨ **NEW** | Get treatments scheduled for today | On org switch |
-| `GET /orgs/:orgId/treatments/follow-ups/today` ✨ **NEW** | Get follow-ups due today | On org switch |
+| `GET /orgs/:orgId/clients?page=1&limit=10` | Count total clients | On org switch |
+| `GET /orgs/:orgId/animals?page=1&limit=10` | Count total pets/livestock | On org switch |
+| `GET /orgs/:orgId/treatments?page=1&limit=10` | Count treatments | On org switch |
+| `GET /orgs/:orgId/revenue` | Get revenue stats | On org switch |
+| `GET /orgs/:orgId/treatments?status=FOLLOW_UP_REQUIRED&limit=5` | Get pending payments | On org switch |
+| `GET /orgs/:orgId/treatments/scheduled/list?page=1&limit=10` | Get unsettled schedules | On org switch |
 
 #### Component Breakdown:
 
@@ -150,7 +152,7 @@ const greeting = `Good morning, ${profile.fullName}`;
 const today = format(new Date(), 'EEEE, MMMM dd');
 ```
 
-**2. Stats Widgets** ✨ **UPDATED - Use Dashboard Stats Endpoint**
+**2. Stats Widgets**
 
 ```typescript
 const { data: orgs } = useQuery({
@@ -158,44 +160,66 @@ const { data: orgs } = useQuery({
   queryFn: () => api.get('/orgs')
 });
 
-// ✨ NEW: Single API call for all dashboard stats
-const { data: stats } = useQuery({
-  queryKey: ['dashboard-stats', orgId],
-  queryFn: () => api.get(`/orgs/${orgId}/dashboard/stats`)
+const { data: clients } = useQuery({
+  queryKey: ['clients', orgId],
+  queryFn: () => api.get(`/orgs/${orgId}/clients`, { params: { page: 1, limit: 1 } }),
+  select: (data) => data.meta.totalCount
 });
 
-// Access stats directly from single response
-const clientsCount = stats.clients.total;
-const activeClients = stats.clients.active;
-const animalsCount = stats.animals.total;
-const petsCount = stats.animals.byPatientType.SINGLE_PET;
-const livestockCount = stats.animals.byPatientType.SINGLE_LIVESTOCK + stats.animals.byPatientType.BATCH_LIVESTOCK;
-const totalRevenue = stats.revenue.total;
-const pendingPayments = stats.revenue.unpaidInvoices;
-const upcomingAppointments = stats.treatments.scheduled;
-const followUpsDue = stats.treatments.followUpsDue;
+const { data: animals } = useQuery({
+  queryKey: ['animals', orgId],
+  queryFn: () => api.get(`/orgs/${orgId}/animals`, { params: { page: 1, limit: 1 } }),
+  select: (data) => data.meta.totalCount
+});
+
+const { data: treatments } = useQuery({
+  queryKey: ['treatments', orgId],
+  queryFn: () => api.get(`/orgs/${orgId}/treatments`, { params: { page: 1, limit: 1 } }),
+  select: (data) => data.meta.totalCount
+});
+
+const { data: revenue } = useQuery({
+  queryKey: ['revenue', orgId],
+  queryFn: () => api.get(`/orgs/${orgId}/revenue`)
+});
+
+const { data: followUps } = useQuery({
+  queryKey: ['treatments', orgId, 'follow-ups'],
+  queryFn: () => api.get(`/orgs/${orgId}/treatments`, { 
+    params: { status: 'FOLLOW_UP_REQUIRED', limit: 100 } 
+  }),
+  select: (data) => data.data.filter(t => isToday(t.followUpDate))
+});
+
+const { data: scheduledTreatments } = useQuery({
+  queryKey: ['treatments', orgId, 'scheduled'],
+  queryFn: () => api.get(`/orgs/${orgId}/treatments/scheduled/list`, { 
+    params: { page: 1, limit: 10 } 
+  })
+});
 ```
 
 **Stats Widget Data:**
 - **Vet Clinics**: `orgs.length` → Click navigates to `/organizations`
-- **Clients**: `stats.clients.total` → Navigate to `/dashboard/clients`
-- **Pets**: `stats.animals.byPatientType.SINGLE_PET` → Navigate to `/dashboard/animals?type=pet`
-- **Livestocks**: `stats.animals.byPatientType.SINGLE_LIVESTOCK + stats.animals.byPatientType.BATCH_LIVESTOCK`
-- **Revenue**: `₦${stats.revenue.total.toLocaleString()}` → Navigate to `/dashboard/revenue`
-- **Pending Payments**: `stats.revenue.unpaidInvoices` → Navigate to `/dashboard/revenue?status=OWED`
-- **Upcoming Appointments**: `stats.treatments.scheduled` → Navigate to `/dashboard/schedule`
+- **Clients**: `clients.totalCount` → Navigate to `/dashboard/clients`
+- **Pets**: `animals.totalCount` → Navigate to `/dashboard/animals`
+- **Livestocks**: `animals.filter(a => a.patientType !== 'SINGLE_PET').length`
+- **Revenue**: `₦${revenue.totalRevenue.toLocaleString()}` → Navigate to `/dashboard/revenue`
+- **Pending Payments**: `revenue.totalOwed` count → Navigate to `/dashboard/revenue?status=OWED`
+- **Upcoming Appointments**: `scheduledTreatments.totalCount` → Navigate to `/dashboard/schedule`
 
-**3. Unsettled Schedules** ✨ **UPDATED - Use Scheduled Today Endpoint**
+**3. Unsettled Schedules**
 
 ```typescript
-// ✨ NEW: Use dedicated endpoint for today's scheduled treatments
-const { data: scheduledToday } = useQuery({
-  queryKey: ['scheduled-treatments', 'today', orgId],
-  queryFn: () => api.get(`/orgs/${orgId}/treatments/scheduled/today`)
+const { data: schedules } = useQuery({
+  queryKey: ['scheduled-treatments', orgId],
+  queryFn: () => api.get(`/orgs/${orgId}/treatments/scheduled/list`, {
+    params: { page: 1, limit: 10 }
+  })
 });
 
 // Map to UI
-scheduledToday.treatments.map(treatment => ({
+schedules.data.map(treatment => ({
   time: format(treatment.scheduledFor, 'h:mm a'),
   type: treatment.diagnosis || 'General Check',
   petName: treatment.animal.name,
@@ -204,17 +228,16 @@ scheduledToday.treatments.map(treatment => ({
 }));
 ```
 
-**4. Don't Forget Section** ✨ **UPDATED - Use Dedicated Endpoints**
+**4. Don't Forget Section**
 
 ```typescript
-// ✨ NEW: Use dedicated endpoint for today's follow-ups
-const { data: followUpsToday } = useQuery({
-  queryKey: ['follow-ups', 'today', orgId],
-  queryFn: () => api.get(`/orgs/${orgId}/treatments/follow-ups/today`)
-});
+const todayFollowUps = followUps.filter(t => 
+  isToday(parseISO(t.followUpDate))
+);
 
-const followUpsCount = followUpsToday.count;
-const unpaidInvoices = stats.revenue.unpaidInvoices; // From dashboard stats
+const unpaidInvoices = treatments.filter(t => 
+  t.paymentStatus === 'OWED'
+);
 ```
 
 ---
@@ -270,7 +293,7 @@ const { data: clientCount } = useQuery({
     text: org.status === 'PENDING_APPROVAL' ? 'Pending approval' : 'In network',
     color: org.status === 'PENDING_APPROVAL' ? 'warning' : 'info'
   },
-  paymentTerms: org.paymentTerms || 'Monthly invoicing', // ✅ IMPLEMENTED in v1.2
+  paymentTerms: org.paymentTerms || 'Monthly invoicing', // Custom field needed
   onClick: () => router.push(`/dashboard?org=${org.id}`)
 }
 ```
@@ -304,8 +327,8 @@ const createOrg = useMutation({
 });
 ```
 
-**API Status:**
-- ✅ `paymentTerms` (string) — **IMPLEMENTED** in v1.2
+**Missing API Fields:**
+- `paymentTerms` (string) — Should be added to Organization model
 
 ---
 
@@ -476,9 +499,9 @@ const { data: followUpsToday } = useQuery({
 });
 ```
 
-**API Status:**
-- ⏳ Vaccination status queries - P1 priority (will be optimized in future release)
-- ⏳ `GET /orgs/:orgId/animals/vaccination-due` endpoint - P1 priority
+**Missing API Features:**
+- Need efficient way to query vaccination status (consider adding `lastVaccinationDate` to Animal model)
+- Consider adding `GET /orgs/:orgId/animals/vaccination-due` endpoint
 
 ---
 
@@ -496,7 +519,7 @@ const { data: followUpsToday } = useQuery({
 
 #### Component Breakdown:
 
-**1. Date Range Picker** ✨ **UPDATED - Backend Supports Date Range**
+**1. Date Range Picker**
 
 ```typescript
 const [dateRange, setDateRange] = useState({
@@ -504,19 +527,18 @@ const [dateRange, setDateRange] = useState({
   to: endOfMonth(new Date())
 });
 
-// ✅ IMPLEMENTED: Backend now supports date range filtering
 const { data: revenue } = useQuery({
   queryKey: ['revenue', orgId, dateRange],
   queryFn: () => api.get(`/orgs/${orgId}/revenue`, {
     params: {
-      fromDate: dateRange.from.toISOString().split('T')[0],
-      toDate: dateRange.to.toISOString().split('T')[0]
+      fromDate: dateRange.from.toISOString(),
+      toDate: dateRange.to.toISOString()
     }
   })
 });
 ```
 
-**Backend Status:** ✅ **IMPLEMENTED** in v1.2
+**Note:** Backend needs to support date range filtering on `/orgs/:orgId/revenue`.
 
 **2. Summary Cards**
 
@@ -540,22 +562,23 @@ const tabs = [
 
 const [activeTab, setActiveTab] = useState('ALL');
 
-// ✅ IMPLEMENTED: Backend now supports paymentCategory filter
 const { data: payments } = useQuery({
   queryKey: ['treatments', orgId, 'payments', activeTab, page],
   queryFn: () => api.get(`/orgs/${orgId}/treatments`, {
     params: {
       page,
       limit: 20,
-      paymentCategory: activeTab, // PET, LIVESTOCK, FARM, or ALL
-      // Optional: also filter by payment status
-      // paymentStatus: 'OWED' or 'PAID'
+      paymentStatus: activeTab === 'ALL' ? undefined : activeTab,
+      // Filter by patient type
+      ...(activeTab === 'PET' && { patientType: 'SINGLE_PET' }),
+      ...(activeTab === 'LIVESTOCK' && { patientType: 'SINGLE_LIVESTOCK' }),
+      ...(activeTab === 'FARM' && { patientType: 'BATCH_LIVESTOCK' })
     }
   })
 });
 ```
 
-**Backend Status:** ✅ **IMPLEMENTED** in v1.2 (use `paymentCategory` query param)
+**Note:** Backend needs to support filtering by `patientType` on treatments endpoint.
 
 **4. Payment Cards**
 
@@ -630,10 +653,10 @@ const { data: followUpsToday } = useQuery({
 });
 ```
 
-**Backend Status:**
-1. ✅ Date range filtering on `GET /orgs/:orgId/revenue` - **IMPLEMENTED**
-2. ✅ Payment category filter on `GET /orgs/:orgId/treatments` - **IMPLEMENTED**
-3. ✅ All features ready for frontend integration
+**Required Backend Changes:**
+1. Add date range filtering to `GET /orgs/:orgId/revenue`
+2. Add `patientType` filter to `GET /orgs/:orgId/treatments`
+3. Remove "restock" related fields (not applicable to veterinary practice)
 
 ---
 
@@ -1075,42 +1098,32 @@ const prefetchAnimal = (animalId: string) => {
 
 ---
 
-## Summary of Backend Implementation Status
+## Summary of Required Backend Changes
 
-### ✅ P0 Endpoints (v1.2 - IMPLEMENTED)
+### 1. New Endpoints Needed
 
-| Endpoint | Status | Purpose |
-|----------|--------|---------|
-| `GET /orgs/:orgId/dashboard/stats` | ✅ **LIVE** | Aggregated dashboard statistics |
-| `GET /orgs/:orgId/treatments/scheduled/today` | ✅ **LIVE** | Treatments scheduled for today |
-| `GET /orgs/:orgId/treatments/follow-ups/today` | ✅ **LIVE** | Follow-ups due today |
-| `GET /orgs/:orgId/revenue?fromDate=...&toDate=...` | ✅ **LIVE** | Revenue with date range filtering |
-| `GET /orgs/:orgId/treatments?paymentCategory=...` | ✅ **LIVE** | Filter treatments by patient type |
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /orgs/:orgId/revenue?fromDate=...&toDate=...` | Date range filtering for revenue |
+| `GET /orgs/:orgId/animals/vaccination-due` | List animals due for vaccination |
+| `GET /orgs/:orgId/treatments?patientType=...` | Filter treatments by patient type |
 
-### ✅ Schema Changes (v1.2 - IMPLEMENTED)
+### 2. New Fields Needed
 
 **Organization Model:**
-- ✅ `paymentTerms` (string, optional) — "Monthly invoicing", "Instant billing", etc.
+- `paymentTerms` (string, optional) — e.g., "Monthly invoicing", "Instant billing"
 
-### ⏳ P1 Endpoints (Planned)
+**Animal Model:**
+- Consider adding `lastVaccinationDate` (DateTime) for efficient querying
 
-| Endpoint | Status | Purpose |
-|----------|--------|---------|
-| `GET /orgs/:orgId/animals/vaccination-due` | ⏳ P1 | List animals due for vaccination |
-| `GET /orgs/:orgId/clients/:clientId/stats` | ⏳ P1 | Client statistics |
-| `GET /orgs/:orgId/animals/:animalId/revenue` | ⏳ P1 | Animal revenue summary |
-
-### ✅ Query Parameter Enhancements
+### 3. Query Parameter Enhancements
 
 **GET /orgs/:orgId/treatments:**
-- ✅ `paymentCategory` filter (PET, LIVESTOCK, FARM, ALL) - Maps to patientType
-- ✅ `paymentStatus` filter (PAID, OWED, PARTIALLY_PAID, WAIVED)
-- ✅ `status` filter (existing)
-- ✅ `animalId` filter (existing)
-- ✅ `vetId` filter (existing)
+- Add `patientType` filter (SINGLE_PET, SINGLE_LIVESTOCK, BATCH_LIVESTOCK)
+- Add date range filters (`fromDate`, `toDate`)
 
 **GET /orgs/:orgId/revenue:**
-- ✅ `fromDate` and `toDate` filters (ISO date strings)
+- Add date range filters (`fromDate`, `toDate`)
 
 ---
 

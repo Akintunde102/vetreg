@@ -2,7 +2,7 @@
 
 This folder contains all project documentation, specifications, and task lists.
 
-**Current Backend Version:** 1.1.0 (February 9, 2026)
+**Current Backend Version:** 1.2.0 (February 9, 2026)
 
 ---
 
@@ -16,9 +16,29 @@ This folder contains all project documentation, specifications, and task lists.
 
 ---
 
-## 🆕 Version 1.1.0 — Backend Implementation Complete
+## 🆕 Version 1.2.0 — P0 Backend Features Complete (Feb 9, 2026)
 
-The backend has been enhanced with the following features. See **[backend/docs](./../backend/docs/)** for full API and migration details.
+P0 features required for the frontend dashboard and revenue flows are implemented and tested.
+
+| Feature | Status | Documentation |
+|--------|--------|----------------|
+| Dashboard statistics (`GET /orgs/:orgId/dashboard/stats`) | ✅ Done | [BACKEND_API_CHANGES.md](./backend/BACKEND_API_CHANGES.md), [P0_IMPLEMENTATION_SUMMARY.md](./backend/P0_IMPLEMENTATION_SUMMARY.md) |
+| Scheduled treatments for today | ✅ Done | [P0_IMPLEMENTATION_SUMMARY.md](./backend/P0_IMPLEMENTATION_SUMMARY.md) |
+| Follow-ups due today | ✅ Done | [P0_IMPLEMENTATION_SUMMARY.md](./backend/P0_IMPLEMENTATION_SUMMARY.md) |
+| Revenue with date range (`?fromDate=&toDate=`) | ✅ Done | [BACKEND_API_CHANGES.md](./backend/BACKEND_API_CHANGES.md) |
+| Treatments filter by payment category (`?paymentCategory=PET\|LIVESTOCK\|FARM`) | ✅ Done | [BACKEND_API_CHANGES.md](./backend/BACKEND_API_CHANGES.md) |
+| Organization `paymentTerms` field | ✅ Done | Schema + [P0_IMPLEMENTATION_SUMMARY.md](./backend/P0_IMPLEMENTATION_SUMMARY.md) |
+
+**Quick links:**
+- [Backend API changes (P0 complete)](./backend/BACKEND_API_CHANGES.md)
+- [P0 implementation summary](./backend/P0_IMPLEMENTATION_SUMMARY.md)
+- [Error code catalog](./backend/ERROR_CODE_CATALOG.md)
+- [Test summary (incl. P0 e2e)](./backend/TEST_SUMMARY.md)
+- [Deployment & testing](./backend/DEPLOYMENT_AND_TESTING.md)
+
+---
+
+## Version 1.1.0 — Backend Foundation
 
 | Feature | Status | Documentation |
 |--------|--------|----------------|
@@ -29,11 +49,7 @@ The backend has been enhanced with the following features. See **[backend/docs](
 | Treatment history import for livestock | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
 | Organization revenue tracking | ✅ Done | [NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) |
 
-**Quick links:**
-- [Backend API reference (v1.1)](../backend/docs/API_ENDPOINTS_V1.1.md)
-- [Migration guide (v1.0 → v1.1)](../backend/docs/MIGRATION_GUIDE.md)
-- [Deployment & testing](./backend/DEPLOYMENT_AND_TESTING.md)
-- [Test results summary](./backend/TEST_RESULTS.md)
+**Quick links:** [Backend API reference (v1.1)](../backend/docs/API_ENDPOINTS_V1.1.md) · [Migration guide (v1.0 → v1.1)](../backend/docs/MIGRATION_GUIDE.md) · [TEST_RESULTS.md](./backend/TEST_RESULTS.md)
 
 ---
 
@@ -225,7 +241,7 @@ Phase 6 — Polish & Ship (Epic 15)
 
 ## 🚀 Next Steps
 
-1. **For Backend Developers:** Start with [BACKEND_TASKS.md](./backend/BACKEND_TASKS.md) Epic 1-3; then see [backend/docs](../backend/docs/) for v1.1 API and migration.
+1. **For Backend Developers:** Start with [BACKEND_TASKS.md](./backend/BACKEND_TASKS.md) Epic 1-3; then see [backend/docs](../backend/docs/) for v1.1 API and [BACKEND_API_CHANGES.md](./backend/BACKEND_API_CHANGES.md) for v1.2 P0 API.
 2. **For Frontend Developers:** Start with [FRONTEND_TASKS.md](./frontend/FRONTEND_TASKS.md) and [Frontend index](./frontend/FRONTEND_INDEX.md) Epic 1-3
 3. **For Full-Stack Developers:** Follow the build order in [TASKS_MASTER.md](./TASKS_MASTER.md)
 4. **For Product/Design:** Review [PRD.md](./PRD.md) for complete feature specifications
@@ -239,7 +255,7 @@ For questions about the PRD or tasks, refer to:
 - PRD Section 31: Glossary (definitions of all key terms)
 - PRD Section 24: Error Handling & Edge Cases (comprehensive scenario matrix)
 - PRD Section 21: API Design (complete endpoint reference with guards, roles, permissions)
-- Backend v1.1: [backend/docs/README.md](../backend/docs/README.md) and [API_ENDPOINTS_V1.1.md](../backend/docs/API_ENDPOINTS_V1.1.md)
+- Backend v1.2: [backend/README.md](./backend/README.md), [BACKEND_API_CHANGES.md](./backend/BACKEND_API_CHANGES.md); v1.1: [API_ENDPOINTS_V1.1.md](../backend/docs/API_ENDPOINTS_V1.1.md)
 
 ---
 
