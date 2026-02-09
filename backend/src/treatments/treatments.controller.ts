@@ -26,6 +26,7 @@ import { DeletePermissionGuard } from '../auth/guards/delete-permission.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequireDeletePermission } from '../auth/decorators/delete-permission.decorator';
+import { SkipResponseTransform } from '../common/decorators/skip-response-transform.decorator';
 import { MembershipRole } from '@prisma/client';
 import type { Vet } from '@prisma/client';
 
@@ -53,6 +54,8 @@ export class TreatmentsController {
     @Query('animalId') animalId?: string,
     @Query('vetId') vetId?: string,
     @Query('status') status?: string,
+    @Query('paymentCategory') paymentCategory?: string,
+    @Query('paymentStatus') paymentStatus?: string,
     @Query('includeDeleted', new DefaultValuePipe(false), ParseBoolPipe)
     includeDeleted?: boolean,
   ) {
@@ -63,6 +66,8 @@ export class TreatmentsController {
       animalId,
       vetId,
       status,
+      paymentCategory,
+      paymentStatus,
       includeDeleted,
     );
   }
@@ -74,6 +79,18 @@ export class TreatmentsController {
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
     return this.treatmentsService.getScheduledTreatments(orgId, page, limit);
+  }
+
+  @Get('scheduled/today')
+  @SkipResponseTransform()
+  async getScheduledToday(@Param('orgId') orgId: string) {
+    return this.treatmentsService.getScheduledToday(orgId);
+  }
+
+  @Get('follow-ups/today')
+  @SkipResponseTransform()
+  async getFollowUpsToday(@Param('orgId') orgId: string) {
+    return this.treatmentsService.getFollowUpsToday(orgId);
   }
 
   @Get(':treatmentId')

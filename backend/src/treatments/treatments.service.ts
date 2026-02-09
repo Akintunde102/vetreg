@@ -117,6 +117,8 @@ export class TreatmentsService {
     animalId?: string,
     vetId?: string,
     status?: string,
+    paymentCategory?: string,
+    paymentStatus?: string,
     includeDeleted: boolean = false,
   ) {
     const skip = (page - 1) * limit;
@@ -139,6 +141,26 @@ export class TreatmentsService {
       where.status = status;
     }
 
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus;
+    }
+
+    // Filter by patient type based on payment category
+    if (paymentCategory && paymentCategory !== 'ALL') {
+      const patientTypeMap: Record<string, string> = {
+        'PET': 'SINGLE_PET',
+        'LIVESTOCK': 'SINGLE_LIVESTOCK',
+        'FARM': 'BATCH_LIVESTOCK',
+      };
+      
+      const patientType = patientTypeMap[paymentCategory];
+      if (patientType) {
+        where.animal = {
+          patientType,
+        };
+      }
+    }
+
     const [treatments, total] = await Promise.all([
       this.prisma.treatmentRecord.findMany({
         where,
@@ -148,6 +170,9 @@ export class TreatmentsService {
               id: true,
               name: true,
               species: true,
+              patientType: true,
+              batchIdentifier: true,
+              batchSize: true,
               client: {
                 select: {
                   id: true,
@@ -605,6 +630,93 @@ export class TreatmentsService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async getScheduledToday(organizationId: string) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const treatments = await this.prisma.treatmentRecord.findMany({
+      where: {
+        organizationId,
+        isDeleted: false,
+        isScheduled: true,
+        scheduledFor: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        animal: {
+          select: {
+            id: true,
+            name: true,
+            species: true,
+            photoUrl: true,
+            client: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { scheduledFor: 'asc' },
+    });
+
+    return {
+      treatments,
+      count: treatments.length,
+    };
+  }
+
+  async getFollowUpsToday(organizationId: string) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const treatments = await this.prisma.treatmentRecord.findMany({
+      where: {
+        organizationId,
+        isDeleted: false,
+        followUpDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        animal: {
+          select: {
+            id: true,
+            name: true,
+            species: true,
+            photoUrl: true,
+            client: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { followUpDate: 'asc' },
+    });
+
+    return {
+      treatments,
+      count: treatments.length,
     };
   }
 }
