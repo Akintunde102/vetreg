@@ -19,7 +19,7 @@ Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Shoul
 - [x] **V1.1** Treatment history import when adding livestock (treatmentHistory array in CreateAnimalDto) `P0`
 - [x] **V1.1** Organization revenue: GET /orgs/:orgId/revenue (totalRevenue, totalPaid, totalOwed, paymentBreakdown) `P0`
 
-See [backend/docs/NEW_FEATURES.md](../backend/docs/NEW_FEATURES.md) and [backend/docs/API_ENDPOINTS_V1.1.md](../backend/docs/API_ENDPOINTS_V1.1.md).
+See [backend/docs/NEW_FEATURES.md](../../backend/docs/NEW_FEATURES.md) and [backend/docs/API_ENDPOINTS_V1.1.md](../../backend/docs/API_ENDPOINTS_V1.1.md).
 
 ---
 

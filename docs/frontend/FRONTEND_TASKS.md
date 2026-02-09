@@ -1,9 +1,54 @@
 # Frontend Tasks — Veterinary Registration & Practice Management Platform
 
+**Version:** 2.0.0  
+**Last Updated:** February 9, 2026  
 **Technology Stack:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui, React Hook Form, Zod, TanStack Query, @supabase/ssr
-**Total Tasks:** ~80
+**Total Tasks:** ~150 (Updated based on new design specifications)
+
+**Design References:**
+- Mobile UI: See [DESIGN_GUIDE.md](./DESIGN_GUIDE.md)
+- Desktop UI: See [DESKTOP_DESIGN_SPEC.md](./DESKTOP_DESIGN_SPEC.md)
+- API Mapping: See [API_FRONTEND_MAPPING.md](./API_FRONTEND_MAPPING.md)
+- Page Breakdown: See [PAGE_COMPONENT_BREAKDOWN.md](./PAGE_COMPONENT_BREAKDOWN.md)
 
 Legend: `[ ]` = To do | `[x]` = Done | Priority: `P0` = Must have | `P1` = Should have | `P2` = Nice to have
+
+---
+
+## Overview of Changes
+
+### New Design-Driven Requirements
+
+Based on the updated mobile designs, the following new components and features are required:
+
+1. **Enhanced Dashboard**
+   - Greeting section with illustrations
+   - Stats widgets with notification badges
+   - Today's agenda section with scheduled treatments
+   - "Don't Forget" reminder panel
+
+2. **Organizations (Clinics) Page**
+   - Clinic cards with client counts
+   - Status indicators (In network, Pending approval)
+   - Pending verification section
+
+3. **Animals (Pets) Page**
+   - Vaccination status indicators
+   - Next schedule/last visit display
+   - Filter tabs with counts
+   - Client quick actions
+
+4. **Revenue Page**
+   - Date range picker
+   - Payment category filters (Pet Payment, Livestock Payment, Farm Payments)
+   - Payment cards with batch information
+   - Mark payment functionality
+
+5. **Pet Detail Page**
+   - Total revenue display
+   - Bio section with vaccination status
+   - Medical history timeline
+   - Treatment cards
 
 ---
 

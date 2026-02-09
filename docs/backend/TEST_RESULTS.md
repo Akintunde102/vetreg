@@ -35,7 +35,7 @@ npm run test:e2e:all    # both suites (178+ tests)
 
 ## E2E Scenario Documentation
 
-**Full list of test scenarios** (basic + deep) is in **[backend/test/README.md](../backend/test/README.md)**.
+**Full list of test scenarios** (basic + deep) is in **[backend/test/README.md](../../backend/test/README.md)**.
 
 ### Basic automated suite (48+ tests)
 

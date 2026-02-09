@@ -6,6 +6,16 @@ This folder contains all project documentation, specifications, and task lists.
 
 ---
 
+## 📁 Folder Structure
+
+| Folder | Contents |
+|--------|----------|
+| **[backend/](./backend/)** | Backend-specific docs: tasks, API change proposals, deployment, test results |
+| **[frontend/](./frontend/)** | Frontend-specific docs: design guide, UI specs, API mapping, architecture, tasks |
+| **Root** | Shared docs: [PRD](./PRD.md), [TASKS_MASTER](./TASKS_MASTER.md), this README |
+
+---
+
 ## 🆕 Version 1.1.0 — Backend Implementation Complete
 
 The backend has been enhanced with the following features. See **[backend/docs](./../backend/docs/)** for full API and migration details.
@@ -22,8 +32,8 @@ The backend has been enhanced with the following features. See **[backend/docs](
 **Quick links:**
 - [Backend API reference (v1.1)](../backend/docs/API_ENDPOINTS_V1.1.md)
 - [Migration guide (v1.0 → v1.1)](../backend/docs/MIGRATION_GUIDE.md)
-- [Deployment & testing](./DEPLOYMENT_AND_TESTING.md)
-- [Test results summary](./TEST_RESULTS.md)
+- [Deployment & testing](./backend/DEPLOYMENT_AND_TESTING.md)
+- [Test results summary](./backend/TEST_RESULTS.md)
 
 ---
 
@@ -52,7 +62,7 @@ The backend has been enhanced with the following features. See **[backend/docs](
 
 ---
 
-### [BACKEND_TASKS.md](./BACKEND_TASKS.md)
+### [BACKEND_TASKS.md](./backend/BACKEND_TASKS.md)
 **Backend Task List** — All backend development tasks organized by epic.
 
 **Technology:** NestJS, TypeScript, Prisma, PostgreSQL (Supabase), Resend/SendGrid, Twilio
@@ -79,7 +89,7 @@ The backend has been enhanced with the following features. See **[backend/docs](
 
 ---
 
-### [FRONTEND_TASKS.md](./FRONTEND_TASKS.md)
+### [FRONTEND_TASKS.md](./frontend/FRONTEND_TASKS.md)
 **Frontend Task List** — All frontend development tasks organized by epic.
 
 **Technology:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui, React Hook Form, Zod, TanStack Query
@@ -215,11 +225,11 @@ Phase 6 — Polish & Ship (Epic 15)
 
 ## 🚀 Next Steps
 
-1. **For Backend Developers:** Start with [BACKEND_TASKS.md](./BACKEND_TASKS.md) Epic 1-3; then see [backend/docs](../backend/docs/) for v1.1 API and migration.
-2. **For Frontend Developers:** Start with [FRONTEND_TASKS.md](./FRONTEND_TASKS.md) Epic 1-3
+1. **For Backend Developers:** Start with [BACKEND_TASKS.md](./backend/BACKEND_TASKS.md) Epic 1-3; then see [backend/docs](../backend/docs/) for v1.1 API and migration.
+2. **For Frontend Developers:** Start with [FRONTEND_TASKS.md](./frontend/FRONTEND_TASKS.md) and [Frontend index](./frontend/FRONTEND_INDEX.md) Epic 1-3
 3. **For Full-Stack Developers:** Follow the build order in [TASKS_MASTER.md](./TASKS_MASTER.md)
 4. **For Product/Design:** Review [PRD.md](./PRD.md) for complete feature specifications
-5. **For Deployment & Testing:** See [DEPLOYMENT_AND_TESTING.md](./DEPLOYMENT_AND_TESTING.md)
+5. **For Deployment & Testing:** See [DEPLOYMENT_AND_TESTING.md](./backend/DEPLOYMENT_AND_TESTING.md)
 
 ---
 

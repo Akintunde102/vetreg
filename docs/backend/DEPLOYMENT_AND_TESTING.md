@@ -104,7 +104,7 @@ npm run test:e2e:all     # Runs all E2E specs
 - Confirm `DATABASE_URL` is set and reachable.
 - Apply migrations: `npx prisma migrate deploy` or `npx prisma db push`.
 - For schema drift, run `npx prisma generate` and re-apply migrations.
-- See [backend/test/README.md](../backend/test/README.md) for test details.
+- See [backend/test/README.md](../../backend/test/README.md) for test details.
 
 ---
 
@@ -275,7 +275,7 @@ Example GitHub Actions steps:
 
 ## Related Documentation
 
-- [Backend README](../backend/README.md) — Setup and run
-- [Backend docs](../backend/docs/README.md) — API and features
-- [Migration guide (v1.1)](../backend/docs/MIGRATION_GUIDE.md) — DB migrations
-- [Test README](../backend/test/README.md) — E2E test details
+- [Backend README](../../backend/README.md) — Setup and run
+- [Backend docs](../../backend/docs/README.md) — API and features
+- [Migration guide (v1.1)](../../backend/docs/MIGRATION_GUIDE.md) — DB migrations
+- [Test README](../../backend/test/README.md) — E2E test details
