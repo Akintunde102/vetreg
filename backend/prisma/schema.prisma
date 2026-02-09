@@ -237,9 +237,10 @@ model Organization {
   phoneNumber String  @map("phone_number")
   email       String?
   website     String?
-  logoUrl     String? @map("logo_url")
-  type        OrgType @default(CLINIC)
-  isActive    Boolean @default(true) @map("is_active")
+  logoUrl      String? @map("logo_url")
+  type         OrgType @default(CLINIC)
+  isActive     Boolean @default(true) @map("is_active")
+  paymentTerms String? @map("payment_terms")
 
   // Approval workflow
   status           OrgStatus @default(PENDING_APPROVAL)

@@ -45,4 +45,8 @@ export class CreateOrganizationDto {
 
   @IsEnum(OrgType)
   type!: OrgType;
+
+  @IsString()
+  @IsOptional()
+  paymentTerms?: string;
 }
