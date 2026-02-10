@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, PawPrint, Plus, ChevronRight, MessageCircle } from 'lucide-react';
-import { mockAnimals } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { AddNewDialog } from '@/components/AddNewDialog';
@@ -13,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { AlertCircle } from 'lucide-react';
 
-const useMockFallback = false; // Always use API
 const PAGE_SIZE = 20;
 
 function getSpeciesEmoji(species: string) {
@@ -35,32 +33,28 @@ export default function AnimalsPage() {
   const { toast } = useToast();
 
   const speciesParam = activeTab === 'ALL' ? undefined : activeTab === 'OTHER' ? 'OTHER' : activeTab.toUpperCase();
+  const { data: dashboardStats } = useQuery({
+    queryKey: queryKeys.dashboard.stats(currentOrgId!),
+    queryFn: () => api.getDashboardStats(currentOrgId!),
+    enabled: !!currentOrgId,
+  });
   const { data: animalsRes, isLoading, isError } = useQuery({
     queryKey: queryKeys.animals.list(currentOrgId!, { page, search, species: activeTab }),
     queryFn: () =>
       api.getAnimals(currentOrgId!, {
         page: String(page),
         limit: String(PAGE_SIZE),
-        search: search || undefined,
-        species: speciesParam,
+        ...(search.trim() ? { search: search.trim() } : {}),
+        ...(speciesParam ? { species: speciesParam } : {}),
       }),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
-  const animalsData = (useMockFallback || isError) ? { data: mockAnimals, meta: { totalCount: mockAnimals.length, totalPages: 1 } } : animalsRes;
-  const animals = animalsData?.data ?? [];
-  const meta = animalsData?.meta;
+  const animals = Array.isArray(animalsRes?.data) ? animalsRes.data : [];
+  const meta = animalsRes?.meta;
   const totalPages = meta?.totalPages ?? 1;
 
-  const filtered = useMockFallback || isError
-    ? animals.filter((a) => {
-        const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
-          a.client?.firstName?.toLowerCase().includes(search.toLowerCase());
-        const matchesTab = activeTab === 'ALL' ||
-          (activeTab === 'OTHER' ? !['Dog', 'Cat'].includes(a.species) : a.species === activeTab);
-        return matchesSearch && matchesTab;
-      })
-    : animals;
+  const filtered = animals;
 
   const counts = {
     all: meta?.totalCount ?? filtered.length,
@@ -209,25 +203,27 @@ export default function AnimalsPage() {
         </Pagination>
       )}
 
-      {/* Don't Forget */}
+      {/* Don't Forget – real counts from dashboard */}
       <div className="bg-accent border border-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <AlertCircle className="w-5 h-5 text-warning" />
-          <h3 className="font-bold text-foreground">Don't Forget</h3>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-warning" />
+            <h3 className="font-bold text-foreground">Don't Forget</h3>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard/schedule')}>
+            View All
+          </Button>
         </div>
         <ul className="space-y-1 text-sm text-foreground">
           <li className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            Pets due for vaccination
+            <strong>{dashboardStats?.animals?.vaccinationDue ?? 0}</strong> pets due for vaccination
           </li>
           <li className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            Follow-ups today
+            <strong>{dashboardStats?.treatments?.followUpsDue ?? 0}</strong> follow-ups today
           </li>
         </ul>
-        <Button variant="secondary" size="sm" className="mt-3" onClick={() => navigate('/dashboard/schedule')}>
-          View All
-        </Button>
       </div>
 
       <div className="lg:hidden pb-4">

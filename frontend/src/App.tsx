@@ -8,6 +8,7 @@ import { OrgProvider } from "@/hooks/useCurrentOrg";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminRoute } from "@/components/auth/AdminRoute";
+import { OrgRequiredGate } from "@/components/auth/OrgRequiredGate";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import LoginPage from "@/pages/Login";
@@ -72,22 +73,24 @@ const App = () => (
                     </Route>
                   </Route>
                   <Route element={<DashboardLayout />}>
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/dashboard/clients" element={<ClientsPage />} />
-                    <Route path="/dashboard/clients/:clientId" element={<ClientDetailPage />} />
-                    <Route path="/dashboard/animals" element={<AnimalsPage />} />
-                    <Route path="/dashboard/animals/:animalId" element={<AnimalDetailPage />} />
-                    <Route path="/dashboard/treatments" element={<TreatmentsPage />} />
-                    <Route path="/dashboard/treatments/:treatmentId" element={<TreatmentDetailPage />} />
-                    <Route path="/dashboard/schedule" element={<SchedulePage />} />
-                    <Route path="/dashboard/revenue" element={<RevenuePage />} />
-                    <Route path="/dashboard/payments" element={<PaymentsPage />} />
-                    <Route path="/organizations" element={<OrganizationsPage />} />
-                    <Route path="/dashboard/settings" element={<SettingsPage />} />
-                    <Route path="/dashboard/reports" element={<ReportsPage />} />
-                    <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
-                    <Route path="/notifications" element={<NotificationsPage />} />
-                    <Route path="/more" element={<MorePage />} />
+                    <Route element={<OrgRequiredGate />}>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/dashboard/clients" element={<ClientsPage />} />
+                      <Route path="/dashboard/clients/:clientId" element={<ClientDetailPage />} />
+                      <Route path="/dashboard/animals" element={<AnimalsPage />} />
+                      <Route path="/dashboard/animals/:animalId" element={<AnimalDetailPage />} />
+                      <Route path="/dashboard/treatments" element={<TreatmentsPage />} />
+                      <Route path="/dashboard/treatments/:treatmentId" element={<TreatmentDetailPage />} />
+                      <Route path="/dashboard/schedule" element={<SchedulePage />} />
+                      <Route path="/dashboard/revenue" element={<RevenuePage />} />
+                      <Route path="/dashboard/payments" element={<PaymentsPage />} />
+                      <Route path="/organizations" element={<OrganizationsPage />} />
+                      <Route path="/dashboard/settings" element={<SettingsPage />} />
+                      <Route path="/dashboard/reports" element={<ReportsPage />} />
+                      <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
+                      <Route path="/notifications" element={<NotificationsPage />} />
+                      <Route path="/more" element={<MorePage />} />
+                    </Route>
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />

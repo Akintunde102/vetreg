@@ -2,16 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, ChevronDown, PawPrint, AlertCircle, ArrowRight, Plus } from 'lucide-react';
-import { mockClients, mockClientDetails } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
 import { AddNewDialog } from '@/components/AddNewDialog';
+import { SmsMessageDialog } from '@/components/SmsMessageDialog';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 import type { Client } from '@/types/api';
 
-const useMockFallback = false; // Always use API
 
 type ClientWithDetails = Client & { petCount?: number; livestockCount?: number; balance?: number; lastVisit?: string };
 
@@ -33,36 +31,34 @@ export default function ClientsPage() {
   const [activeTab, setActiveTab] = useState('ALL');
   const [addOpen, setAddOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [smsClient, setSmsClient] = useState<ClientWithDetails | null>(null);
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { currentOrgId } = useCurrentOrg();
+  const { currentOrgId, currentOrg } = useCurrentOrg();
 
+  const { data: dashboardStats } = useQuery({
+    queryKey: queryKeys.dashboard.stats(currentOrgId!),
+    queryFn: () => api.getDashboardStats(currentOrgId!),
+    enabled: !!currentOrgId,
+  });
   const { data: clientsRes, isLoading, isError } = useQuery({
     queryKey: queryKeys.clients.list(currentOrgId!, { page: String(page), search }),
     queryFn: () =>
       api.getClients(currentOrgId!, {
         page: String(page),
         limit: '50',
-        search: search || undefined,
+        ...(search.trim() ? { search: search.trim() } : {}),
       }),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
-  const clientsRaw = useMockFallback || isError
-    ? mockClients.map((c) => {
-        const details = mockClientDetails.find((d) => d.clientId === c.id);
-        return { ...c, ...details } as ClientWithDetails;
-      })
-    : (clientsRes?.data ?? []);
-  const clients: ClientWithDetails[] = useMockFallback || isError
-    ? clientsRaw
-    : clientsRaw.map((c) => ({
-        ...c,
-        petCount: c._count?.animals,
-        lastVisit: '—',
-        balance: 0,
-        livestockCount: 0,
-      }));
+  const clientsRaw = Array.isArray(clientsRes?.data) ? clientsRes.data : [];
+  const clients: ClientWithDetails[] = clientsRaw.map((c) => ({
+    ...c,
+    petCount: c._count?.animals,
+    lastVisit: '—',
+    balance: 0,
+    livestockCount: 0,
+  }));
 
   const filtered = clients.filter((c) => {
     const matchesSearch =
@@ -113,7 +109,7 @@ export default function ClientsPage() {
         ))}
       </div>
 
-      {isLoading && !useMockFallback ? (
+      {isLoading ? (
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="h-32 bg-card border border-border rounded-xl animate-pulse" />
@@ -158,7 +154,7 @@ export default function ClientsPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toast({ title: 'Message sent', description: `SMS sent to ${client.firstName} ${client.lastName}.` });
+                            setSmsClient(client);
                           }}
                           className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
                         >
@@ -197,6 +193,17 @@ export default function ClientsPage() {
         </div>
       )}
 
+      {smsClient && (
+        <SmsMessageDialog
+          open={!!smsClient}
+          onOpenChange={(open) => !open && setSmsClient(null)}
+          clientFirstName={smsClient.firstName}
+          orgName={currentOrg?.name ?? 'Our clinic'}
+          phoneNumber={smsClient.phoneNumber}
+          balance={smsClient.balance ?? 0}
+        />
+      )}
+
       <div className="bg-accent border border-border rounded-xl p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -213,11 +220,11 @@ export default function ClientsPage() {
         <ul className="space-y-1">
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>2</strong> follow-ups today
+            <strong>{dashboardStats?.treatments?.followUpsDue ?? 0}</strong> follow-ups today
           </li>
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>2</strong> unpaid invoices
+            <strong>{dashboardStats?.revenue?.unpaidInvoices ?? 0}</strong> unpaid invoices
           </li>
         </ul>
       </div>

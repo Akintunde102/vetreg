@@ -23,13 +23,29 @@ export class ClientsService {
     vetId: string,
     dto: CreateClientDto,
   ) {
+    if (dto.email?.trim()) {
+      const existing = await this.prisma.client.findFirst({
+        where: {
+          organizationId,
+          isDeleted: false,
+          email: { equals: dto.email.trim(), mode: 'insensitive' },
+        },
+      });
+      if (existing) {
+        throw new BadRequestException({
+          code: 'CLIENT_EMAIL_TAKEN',
+          message: 'A client with this email already exists in this organization.',
+        });
+      }
+    }
+
     const client = await this.prisma.client.create({
       data: {
         organizationId,
         createdBy: vetId,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        email: dto.email,
+        email: dto.email?.trim() || null,
         phoneNumber: dto.phoneNumber,
         alternatePhone: dto.alternatePhone,
         address: dto.address,
@@ -175,7 +191,7 @@ export class ClientsService {
       data: {
         firstName: dto.firstName,
         lastName: dto.lastName,
-        email: dto.email,
+        email: dto.email?.trim() || null,
         phoneNumber: dto.phoneNumber,
         alternatePhone: dto.alternatePhone,
         address: dto.address,

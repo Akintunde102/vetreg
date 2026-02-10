@@ -65,9 +65,11 @@ export default function LandingPage() {
                     Start Free
                   </button>
                 </Link>
-                <button className="font-semibold border border-border bg-[hsl(0,0%,100%)] text-foreground px-6 py-3 rounded-lg hover:bg-muted transition-colors text-sm sm:text-base">
-                  Watch Demo
-                </button>
+                <Link to="/login">
+                  <button className="font-semibold border border-border bg-[hsl(0,0%,100%)] text-foreground px-6 py-3 rounded-lg hover:bg-muted transition-colors text-sm sm:text-base">
+                    See it in action
+                  </button>
+                </Link>
               </div>
               <p className="mt-4 text-xs text-muted-foreground flex items-center gap-1.5">
                 <PawPrint className="w-4 h-4" /> Made for private practicing veterinarians

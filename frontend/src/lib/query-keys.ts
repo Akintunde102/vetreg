@@ -7,7 +7,9 @@ export const queryKeys = {
     all: ['orgs'] as const,
     detail: (orgId: string) => ['orgs', orgId] as const,
     members: (orgId: string) => ['orgs', orgId, 'members'] as const,
+    invitations: (orgId: string) => ['orgs', orgId, 'invitations'] as const,
     revenue: (orgId: string, params?: Record<string, string>) => ['orgs', orgId, 'revenue', params ?? {}] as const,
+    activityLog: (orgId: string, page?: number, limit?: number) => ['orgs', orgId, 'activity-log', page ?? 1, limit ?? 50] as const,
   },
   clients: {
     list: (orgId: string, filters: Record<string, unknown>) => ['clients', orgId, filters] as const,

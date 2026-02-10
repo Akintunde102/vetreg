@@ -9,7 +9,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { mockAppointments } from '@/lib/mock-data';
 import { parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
@@ -17,7 +16,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 import type { Treatment } from '@/types/api';
 
-const useMockFallback = false; // Always use API
 
 function getSpeciesEmoji(species: string) {
   switch (species.toLowerCase()) {
@@ -46,22 +44,27 @@ export default function SchedulePage() {
   const { data: scheduledTodayData } = useQuery({
     queryKey: queryKeys.dashboard.scheduledToday(currentOrgId!),
     queryFn: () => api.getScheduledToday(currentOrgId!),
-    enabled: !!currentOrgId && !useMockFallback && isSelectedToday,
+    enabled: !!currentOrgId && isSelectedToday,
   });
   const { data: followUpsData } = useQuery({
     queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
     queryFn: () => api.getFollowUpsToday(currentOrgId!),
-    enabled: !!currentOrgId && !useMockFallback && isSelectedToday,
+    enabled: !!currentOrgId && isSelectedToday,
   });
   const { data: scheduledListData } = useQuery({
     queryKey: queryKeys.treatments.scheduledList(currentOrgId!, fromStr, toStr),
     queryFn: () =>
       api.getScheduledList(currentOrgId!, { from: fromStr, to: toStr, limit: '100' }),
-    enabled: !!currentOrgId && !useMockFallback && !isSelectedToday,
+    enabled: !!currentOrgId && !isSelectedToday,
+  });
+  const { data: dashboardStats } = useQuery({
+    queryKey: queryKeys.dashboard.stats(currentOrgId!),
+    queryFn: () => api.getDashboardStats(currentOrgId!),
+    enabled: !!currentOrgId,
   });
 
-  const appointments: Treatment[] = useMockFallback || !currentOrgId
-    ? mockAppointments
+  const appointments: Treatment[] = !currentOrgId
+    ? []
     : useMemo(() => {
         if (isSelectedToday) {
           const scheduled = (scheduledTodayData as { treatments?: Treatment[] })?.treatments ?? [];
@@ -216,7 +219,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Don't Forget */}
+      {/* Don't Forget – real counts from dashboard */}
       <div className="bg-accent border border-border rounded-xl p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -233,11 +236,11 @@ export default function SchedulePage() {
         <ul className="space-y-1">
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>2</strong> overdue restocks
+            <strong>{dashboardStats?.treatments?.followUpsDue ?? 0}</strong> follow-ups today
           </li>
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>2</strong> follow-ups today
+            <strong>{dashboardStats?.revenue?.unpaidInvoices ?? 0}</strong> unpaid invoices
           </li>
         </ul>
       </div>

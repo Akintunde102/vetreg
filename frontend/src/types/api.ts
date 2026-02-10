@@ -42,6 +42,18 @@ export interface Organization {
   _counts?: {
     clients: number;
     animals: number;
+    members?: number;
+  };
+  /** Present when listing organizations the user belongs to */
+  membership?: {
+    role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    joinedAt: string;
+    permissions?: {
+      canDeleteClients?: boolean;
+      canDeleteAnimals?: boolean;
+      canDeleteTreatments?: boolean;
+      canViewActivityLog?: boolean;
+    };
   };
 }
 
@@ -49,6 +61,19 @@ export interface Organization {
 export interface PendingOrganization extends Organization {
   creator?: { id: string; fullName: string; email: string; phoneNumber?: string };
   _count?: { memberships: number };
+}
+
+export type MembershipRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+export interface Invitation {
+  id: string;
+  organizationId: string;
+  invitedEmail: string;
+  role: MembershipRole;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  inviter?: { id: string; fullName: string; email: string };
 }
 
 export interface Client {
@@ -105,6 +130,7 @@ export interface DashboardStats {
   clients: { total: number; active: number };
   animals: {
     total: number;
+    vaccinationDue?: number;
     byPatientType: {
       SINGLE_PET: number;
       SINGLE_LIVESTOCK: number;
@@ -137,5 +163,23 @@ export interface PaginatedResponse<T> {
     limit: number;
     totalCount: number;
     totalPages: number;
+  };
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  organizationId: string;
+  vetId: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  description: string;
+  metadata?: unknown;
+  createdAt: string;
+  vet?: {
+    id: string;
+    fullName: string;
+    email?: string;
+    profilePhotoUrl?: string;
   };
 }

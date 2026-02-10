@@ -2,12 +2,14 @@ import type {
   VetProfile,
   Organization,
   PendingOrganization,
+  Invitation,
   Animal,
   Client,
   Treatment,
   DashboardStats,
   RevenueData,
   PaginatedResponse,
+  ActivityLogEntry,
 } from '@/types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
@@ -74,6 +76,18 @@ class ApiClient {
     return 'data' in res ? res.data : (res as unknown as Organization[]);
   }
 
+  async getActivityLog(orgId: string, params?: { page?: number; limit?: number }) {
+    const query = params && (params.page != null || params.limit != null)
+      ? '?' + new URLSearchParams({
+          ...(params.page != null && { page: String(params.page) }),
+          ...(params.limit != null && { limit: String(params.limit) }),
+        }).toString()
+      : '';
+    return this.request<{ logs: ActivityLogEntry[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/orgs/${orgId}/activity-log${query}`
+    );
+  }
+
   async createOrganization(data: { name: string; address: string; city: string; state: string; country?: string; phoneNumber: string; type: string; paymentTerms?: string; description?: string; email?: string; website?: string }) {
     const res = await this.request<{ data: Organization }>('/orgs', {
       method: 'POST',
@@ -85,6 +99,24 @@ class ApiClient {
   async getOrganization(orgId: string): Promise<Organization> {
     const res = await this.request<{ data: Organization }>(`/orgs/${orgId}`);
     return res.data;
+  }
+
+  async getInvitations(orgId: string): Promise<Invitation[]> {
+    const res = await this.request<{ data?: Invitation[] } | Invitation[]>(`/orgs/${orgId}/invitations`);
+    if (Array.isArray(res)) return res;
+    return res.data ?? [];
+  }
+
+  async createInvitation(orgId: string, data: { invitedEmail: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' }): Promise<Invitation> {
+    const res = await this.request<{ data: Invitation }>(`/orgs/${orgId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res.data;
+  }
+
+  async cancelInvitation(orgId: string, invitationId: string): Promise<void> {
+    await this.request(`/orgs/${orgId}/invitations/${invitationId}`, { method: 'DELETE' });
   }
 
   // Dashboard
@@ -113,10 +145,29 @@ class ApiClient {
   }
 
   // Animals
-  async getAnimals(orgId: string, params?: Record<string, string>) {
-    const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    const res = await this.request<{ data: PaginatedResponse<Animal> }>(`/orgs/${orgId}/animals${query}`);
-    return res.data;
+  async getAnimals(orgId: string, params?: Record<string, string | undefined>) {
+    const cleanParams =
+      params &&
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v != null && v !== '')
+      ) as Record<string, string>;
+    const query = cleanParams && Object.keys(cleanParams).length > 0
+      ? '?' + new URLSearchParams(cleanParams).toString()
+      : '';
+    const res = await this.request<{ data: { animals?: Animal[]; pagination?: { page: number; limit: number; total: number; totalPages: number } } } | { data: PaginatedResponse<Animal> }>(`/orgs/${orgId}/animals${query}`);
+    const raw = res && typeof res === 'object' && 'data' in res ? (res as { data: unknown }).data : res;
+    if (raw && typeof raw === 'object' && 'animals' in raw && Array.isArray((raw as { animals: unknown }).animals)) {
+      const { animals, pagination } = raw as { animals: Animal[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
+      return {
+        data: animals,
+        meta: pagination
+          ? { page: pagination.page, limit: pagination.limit, totalCount: pagination.total, totalPages: pagination.totalPages }
+          : { page: 1, limit: 50, totalCount: animals.length, totalPages: 1 },
+      };
+    }
+    if (raw && typeof raw === 'object' && 'data' in raw && Array.isArray((raw as { data: unknown }).data))
+      return raw as PaginatedResponse<Animal>;
+    return { data: [], meta: { page: 1, limit: 50, totalCount: 0, totalPages: 1 } };
   }
 
   async createAnimal(orgId: string, data: Record<string, unknown>) {
@@ -139,15 +190,29 @@ class ApiClient {
   }
 
   // Clients
-  async getClients(orgId: string, params?: Record<string, string>) {
-    const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    const res = await this.request<{ data: PaginatedResponse<Client> } | { data: { clients: Client[]; pagination: { page: number; limit: number; total: number; totalPages: number } } }>(`/orgs/${orgId}/clients${query}`);
-    const raw = 'data' in res ? res.data : res;
-    if (raw && typeof raw === 'object' && 'clients' in raw && 'pagination' in raw) {
-      const { clients, pagination } = raw as { clients: Client[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
-      return { data: clients, meta: { page: pagination.page, limit: pagination.limit, totalCount: pagination.total, totalPages: pagination.totalPages } };
+  async getClients(orgId: string, params?: Record<string, string | undefined>) {
+    const cleanParams =
+      params &&
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v != null && v !== '')
+      ) as Record<string, string>;
+    const query = cleanParams && Object.keys(cleanParams).length > 0
+      ? '?' + new URLSearchParams(cleanParams).toString()
+      : '';
+    const res = await this.request<{ data: PaginatedResponse<Client> } | { data: { clients: Client[]; pagination: { page: number; limit: number; total: number; totalPages: number } } } | { success: boolean; data: { clients: Client[]; pagination: { page: number; limit: number; total: number; totalPages: number } } }>(`/orgs/${orgId}/clients${query}`);
+    const raw = res && typeof res === 'object' && 'data' in res ? (res as { data: unknown }).data : res;
+    if (raw && typeof raw === 'object' && 'clients' in raw && Array.isArray((raw as { clients: unknown }).clients)) {
+      const { clients, pagination } = raw as { clients: Client[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
+      return {
+        data: clients,
+        meta: pagination
+          ? { page: pagination.page, limit: pagination.limit, totalCount: pagination.total, totalPages: pagination.totalPages }
+          : { page: 1, limit: 50, totalCount: clients.length, totalPages: 1 },
+      };
     }
-    return raw as PaginatedResponse<Client>;
+    if (raw && typeof raw === 'object' && 'data' in raw && Array.isArray((raw as { data: unknown }).data))
+      return raw as PaginatedResponse<Client>;
+    return { data: [], meta: { page: 1, limit: 50, totalCount: 0, totalPages: 0 } };
   }
 
   async getClient(orgId: string, clientId: string): Promise<Client> {
@@ -168,6 +233,13 @@ class ApiClient {
     return 'data' in res ? res.data : (res as unknown as Client);
   }
 
+  async deleteClient(orgId: string, clientId: string, body: { reason: string }): Promise<void> {
+    await this.request(`/orgs/${orgId}/clients/${clientId}`, {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    });
+  }
+
   // Revenue
   async getRevenue(orgId: string, params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -176,10 +248,35 @@ class ApiClient {
   }
 
   // Treatments
-  async getTreatments(orgId: string, params?: Record<string, string>) {
-    const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    const res = await this.request<{ data: PaginatedResponse<Treatment> }>(`/orgs/${orgId}/treatments${query}`);
-    return res.data;
+  async getTreatments(orgId: string, params?: Record<string, string | undefined>) {
+    const cleanParams =
+      params &&
+      (Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v != null && v !== '')
+      ) as Record<string, string>);
+    const query =
+      cleanParams && Object.keys(cleanParams).length > 0
+        ? '?' + new URLSearchParams(cleanParams).toString()
+        : '';
+    const res = await this.request<
+      | { data: PaginatedResponse<Treatment> }
+      | { data: { treatments: Treatment[]; pagination?: { page: number; limit: number; total: number; totalPages: number } } }
+      | { treatments: Treatment[]; pagination?: { page: number; limit: number; total: number; totalPages: number } }
+    >(`/orgs/${orgId}/treatments${query}`);
+    const body = res && typeof res === 'object' && 'data' in res ? (res as { data: unknown }).data : res;
+    if (body && typeof body === 'object' && 'treatments' in body && Array.isArray((body as { treatments: Treatment[] }).treatments)) {
+      const r = body as { treatments: Treatment[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
+      return {
+        data: r.treatments,
+        meta: r.pagination
+          ? { page: r.pagination.page, limit: r.pagination.limit, totalCount: r.pagination.total, totalPages: r.pagination.totalPages }
+          : { page: 1, limit: 50, totalCount: r.treatments.length, totalPages: 1 },
+      };
+    }
+    if (body && typeof body === 'object' && 'data' in body && Array.isArray((body as { data: Treatment[] }).data)) {
+      return body as PaginatedResponse<Treatment>;
+    }
+    return (res as { data: PaginatedResponse<Treatment> })?.data ?? { data: [], meta: { page: 1, limit: 50, totalCount: 0, totalPages: 1 } };
   }
 
   async getTreatment(orgId: string, treatmentId: string) {
@@ -206,7 +303,7 @@ class ApiClient {
     });
   }
 
-  async updateTreatment(orgId: string, treatmentId: string, data: Partial<Treatment>) {
+  async updateTreatment(orgId: string, treatmentId: string, data: Partial<Treatment> & Record<string, unknown>) {
     return this.request(`/orgs/${orgId}/treatments/${treatmentId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

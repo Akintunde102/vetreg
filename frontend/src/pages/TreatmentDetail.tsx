@@ -1,16 +1,20 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, PawPrint, Building2 } from 'lucide-react';
+import { ArrowLeft, PawPrint, Building2, Edit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { EditTreatmentDialog } from '@/components/EditTreatmentDialog';
 
 export default function TreatmentDetailPage() {
   const { treatmentId } = useParams<{ treatmentId: string }>();
   const { currentOrgId } = useCurrentOrg();
   const navigate = useNavigate();
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: treatment, isLoading } = useQuery({
     queryKey: queryKeys.treatments.detail(currentOrgId!, treatmentId!),
@@ -55,15 +59,20 @@ export default function TreatmentDetailPage() {
               {format(parseISO(treatment.visitDate), 'EEEE, MMMM d, yyyy')}
             </p>
           </div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-medium ${
-              treatment.paymentStatus === 'PAID'
-                ? 'bg-primary/10 text-primary'
-                : 'bg-destructive/10 text-destructive'
-            }`}
-          >
-            {treatment.paymentStatus === 'PAID' ? 'Paid' : 'Pending'}
-          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+              <Edit className="w-3.5 h-3.5" /> Edit
+            </Button>
+            <span
+              className={
+                treatment.paymentStatus === 'PAID'
+                  ? 'px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary'
+                  : 'px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive'
+              }
+            >
+              {treatment.paymentStatus === 'PAID' ? 'Paid' : 'Pending'}
+            </span>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -110,6 +119,12 @@ export default function TreatmentDetailPage() {
           )}
         </div>
       </div>
+
+      <EditTreatmentDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        treatment={treatment}
+      />
     </div>
   );
 }

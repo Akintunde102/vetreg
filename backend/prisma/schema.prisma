@@ -347,6 +347,7 @@ model Client {
   // Relations
   animals Animal[]
 
+  @@unique([organizationId, email])
   @@index([organizationId])
   @@index([organizationId, isDeleted])
   @@index([organizationId, firstName, lastName])

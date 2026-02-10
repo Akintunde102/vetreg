@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { mockTreatments } from '@/lib/mock-data';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -13,7 +12,6 @@ import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 
-const useMockFallback = false; // Always use API
 
 const sortOptions = [
   { label: 'Date (Newest)', value: 'date-desc' },
@@ -32,10 +30,10 @@ export default function PaymentsPage() {
   const { data: treatmentsRes, isLoading, isError } = useQuery({
     queryKey: queryKeys.treatments.list(currentOrgId!, { payments: 'all' }),
     queryFn: () => api.getTreatments(currentOrgId!, { limit: '500' }),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
-  const allTreatments = useMockFallback || isError ? mockTreatments : treatmentsRes?.data ?? [];
+  const allTreatments = treatmentsRes?.data ?? [];
 
   const filtered = allTreatments
     .filter(t => {
@@ -232,7 +230,7 @@ export default function PaymentsPage() {
         </Table>
       </div>
 
-      {(isLoading && !useMockFallback) && (
+      {isLoading && (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       )}
 

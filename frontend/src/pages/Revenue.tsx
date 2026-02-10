@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Calendar, Search, AlertCircle, ArrowRight, Filter, ArrowUpDown, Plus } from 'lucide-react';
 import { format, parseISO, subDays } from 'date-fns';
-import { mockRevenue, mockTreatments } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AddNewDialog } from '@/components/AddNewDialog';
@@ -13,7 +12,6 @@ import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 
-const useMockFallback = false; // Always use API
 
 const categoryTabs = [
   { label: 'All Payments', value: 'ALL' },
@@ -51,13 +49,13 @@ export default function RevenuePage() {
         fromDate: dateRange.from.toISOString().split('T')[0],
         toDate: dateRange.to.toISOString().split('T')[0],
       }),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
   const { data: followUpsData } = useQuery({
     queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
     queryFn: () => api.getFollowUpsToday(currentOrgId!),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
   const followUpsCount = (followUpsData as { count?: number })?.count ?? 0;
 
@@ -69,35 +67,43 @@ export default function RevenuePage() {
         paymentCategory: activeCategory === 'ALL' ? undefined : activeCategory,
         limit: '100',
       }),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
   const mapRevenue = (data: unknown) => {
-    if (!data || typeof data !== 'object') return mockRevenue;
+    if (!data || typeof data !== 'object') return { totalRevenue: 0, paymentBreakdown: { PAID: { count: 0, total: 0 }, OWED: { count: 0, total: 0 } } };
     const d = data as Record<string, unknown>;
     const pb = d.paymentBreakdown as Array<{ status: string; count: number }> | undefined;
     const paid = pb?.find((x) => x.status === 'PAID');
     const owed = pb?.find((x) => x.status === 'OWED');
     return {
-      totalRevenue: Number(d.totalRevenue) || mockRevenue.totalRevenue,
+      totalRevenue: Number(d.totalRevenue) || 0,
       paymentBreakdown: {
         PAID: { count: paid?.count ?? 0, total: 0 },
         OWED: { count: owed?.count ?? 0, total: 0 },
       },
     };
   };
-  const revenue = (useMockFallback || revenueError) ? mockRevenue : mapRevenue(revenueData);
-  const treatmentsRaw = (useMockFallback || !treatmentsRes) ? mockTreatments : treatmentsRes?.data ?? [];
+  const revenue = revenueError ? { totalRevenue: 0, paymentBreakdown: { PAID: { count: 0, total: 0 }, OWED: { count: 0, total: 0 } } } : mapRevenue(revenueData);
+  const treatmentsRaw = treatmentsRes?.data ?? [];
   const paidCount = revenue.paymentBreakdown?.PAID?.count ?? 0;
   const owedCount = revenue.paymentBreakdown?.OWED?.count ?? 0;
 
+  const fromStr = format(dateRange.from, 'yyyy-MM-dd');
+  const toStr = format(dateRange.to, 'yyyy-MM-dd');
+
   const filtered = treatmentsRaw
     .filter((t) => {
+      const visitStr = t.visitDate?.slice(0, 10) ?? '';
+      const inDateRange = visitStr >= fromStr && visitStr <= toStr;
       const matchesSearch =
         search === '' ||
         t.animal?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        t.organization?.name?.toLowerCase().includes(search.toLowerCase());
-      return matchesSearch;
+        (t.animal?.client?.firstName && t.animal?.client?.lastName &&
+          `${t.animal.client.firstName} ${t.animal.client.lastName}`.toLowerCase().includes(search.toLowerCase())) ||
+        t.organization?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        (t.animal?.batchIdentifier && `batch ${t.animal.batchIdentifier}`.toLowerCase().includes(search.toLowerCase()));
+      return inDateRange && matchesSearch;
     })
     .sort((a, b) => {
       if (sortBy === 'date-desc') return new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime();

@@ -2,14 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, ClipboardList, Calendar, Plus } from 'lucide-react';
-import { mockTreatments } from '@/lib/mock-data';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 
-const useMockFallback = false; // Always use API
 
 const statusTabs = [
   { label: 'All', value: 'ALL' },
@@ -40,10 +38,10 @@ export default function TreatmentsPage() {
         search: search || undefined,
         status: activeStatus === 'ALL' ? undefined : activeStatus,
       }),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
-  const treatments = useMockFallback || isError ? mockTreatments : treatmentsRes?.data ?? [];
+  const treatments = treatmentsRes?.data ?? [];
 
   const filtered = treatments.filter(t => {
     const matchesStatus = activeStatus === 'ALL' || t.status === activeStatus;
@@ -92,7 +90,7 @@ export default function TreatmentsPage() {
       </div>
 
       {/* Cards */}
-      {isLoading && !useMockFallback ? (
+      {isLoading ? (
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="h-32 bg-card border border-border rounded-xl animate-pulse" />

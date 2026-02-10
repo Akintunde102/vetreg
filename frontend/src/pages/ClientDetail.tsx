@@ -1,16 +1,18 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Mail, PawPrint, Calendar, DollarSign, Clock } from 'lucide-react';
-import { mockClients, mockClientDetails, mockAnimals, mockTreatments } from '@/lib/mock-data';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Phone, Mail, PawPrint, Calendar, DollarSign, Clock, MessageSquare, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import { useToast } from '@/hooks/use-toast';
+import { ReasonModal } from '@/components/admin/ReasonModal';
+import { SmsMessageDialog } from '@/components/SmsMessageDialog';
+import { Button } from '@/components/ui/button';
 import type { Client } from '@/types/api';
 import type { Animal as AnimalType, Treatment } from '@/types/api';
-
-const useMockFallback = false; // Always use API
 
 function getSpeciesEmoji(species: string) {
   switch (species.toLowerCase()) {
@@ -24,37 +26,46 @@ function getSpeciesEmoji(species: string) {
 export default function ClientDetailPage() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { currentOrgId } = useCurrentOrg();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { currentOrgId, currentOrg } = useCurrentOrg();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
 
   const { data: clientData, isLoading, isError } = useQuery({
     queryKey: queryKeys.clients.detail(currentOrgId!, clientId!),
     queryFn: () => api.getClient(currentOrgId!, clientId!),
-    enabled: !!currentOrgId && !!clientId && !useMockFallback,
+    enabled: !!currentOrgId && !!clientId,
   });
   const { data: clientAnimals = [] } = useQuery({
     queryKey: ['clients', currentOrgId, clientId, 'animals'],
     queryFn: () => api.getClientAnimals(currentOrgId!, clientId!),
-    enabled: !!currentOrgId && !!clientId && !useMockFallback,
+    enabled: !!currentOrgId && !!clientId,
   });
   const { data: orgTreatmentsRes } = useQuery({
     queryKey: queryKeys.treatments.list(currentOrgId!, { clientDetail: clientId }),
     queryFn: () => api.getTreatments(currentOrgId!, { limit: '200' }),
-    enabled: !!currentOrgId && !!clientId && !useMockFallback && (clientAnimals?.length ?? 0) > 0,
+    enabled: !!currentOrgId && !!clientId && (clientAnimals?.length ?? 0) > 0,
   });
 
-  const client: Client | undefined = useMockFallback || isError
-    ? mockClients.find((c) => c.id === clientId)
-    : clientData;
-  const details = mockClientDetails.find((d) => d.clientId === clientId);
-  const animals: AnimalType[] = useMockFallback || isError
-    ? mockAnimals.filter((a) => a.clientId === clientId)
-    : (clientAnimals ?? []);
-  const allTreatments = useMockFallback || isError
-    ? mockTreatments
-    : orgTreatmentsRes?.data ?? [];
-  const treatments: Treatment[] = useMockFallback || isError
-    ? mockTreatments.filter((t) => animals.some((a) => a.id === t.animalId))
-    : allTreatments.filter((t) => animals.some((a) => a.id === t.animalId));
+  const deleteClientMutation = useMutation({
+    mutationFn: (reason: string) => api.deleteClient(currentOrgId!, clientId!, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients.list(currentOrgId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(currentOrgId!, clientId!) });
+      toast({ title: 'Client deleted', description: 'The client has been removed.' });
+      navigate('/dashboard/clients');
+    },
+    onError: (err: { message?: string }) => {
+      toast({ title: 'Delete failed', description: err?.message ?? 'Could not delete client.', variant: 'destructive' });
+    },
+  });
+
+  const client: Client | undefined = clientData;
+  const animals: AnimalType[] = clientAnimals ?? [];
+  const allTreatments = orgTreatmentsRes?.data ?? [];
+  const treatments: Treatment[] = allTreatments.filter((t) => animals.some((a) => a.id === t.animalId));
+  const canDelete = currentOrg?.membership?.permissions?.canDeleteClients ?? false;
 
   if (!client && !isLoading) {
     return (
@@ -68,7 +79,7 @@ export default function ClientDetailPage() {
     );
   }
 
-  if (isLoading && !useMockFallback) {
+  if (isLoading) {
     return (
       <div className="space-y-5 animate-fade-in">
         <div className="h-8 w-24 bg-muted rounded animate-pulse" />
@@ -78,9 +89,9 @@ export default function ClientDetailPage() {
   }
 
   const initials = `${client!.firstName[0]}${client!.lastName[0]}`;
-  const balance = details?.balance ?? 0;
   const totalPaid = treatments.filter(t => t.paymentStatus === 'PAID').reduce((s, t) => s + (t.amount || 0), 0);
   const totalOwed = treatments.filter(t => t.paymentStatus === 'OWED').reduce((s, t) => s + (t.amount || 0), 0);
+  const balance = totalOwed;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -106,6 +117,16 @@ export default function ClientDetailPage() {
                 </p>
               )}
             </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setSmsOpen(true)}>
+              <MessageSquare className="w-4 h-4" /> Message
+            </Button>
+            {canDelete && (
+              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="w-4 h-4" /> Delete client
+              </Button>
+            )}
           </div>
           {balance > 0 && (
             <span className="text-xs font-bold text-warning bg-warning/10 border border-warning/20 px-3 py-1.5 rounded-lg h-fit flex-shrink-0">
@@ -260,6 +281,24 @@ export default function ClientDetailPage() {
           </div>
         </div>
       </div>
+
+      <SmsMessageDialog
+        open={smsOpen}
+        onOpenChange={setSmsOpen}
+        clientFirstName={client.firstName}
+        orgName={currentOrg?.name ?? 'Our clinic'}
+        phoneNumber={client.phoneNumber}
+        balance={balance}
+      />
+      <ReasonModal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete client"
+        description="This will soft-delete the client and all their animals and treatment records. You can restore them later if needed. Please provide a reason (min 10 characters)."
+        submitLabel="Delete client"
+        variant="destructive"
+        onSubmit={(reason) => deleteClientMutation.mutateAsync(reason)}
+      />
     </div>
   );
 }

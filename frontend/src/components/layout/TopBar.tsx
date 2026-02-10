@@ -1,5 +1,6 @@
-import { Bell, Search, ChevronDown, LogOut, Settings } from 'lucide-react';
+import { Bell, Building2, Search, ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
@@ -8,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -16,12 +18,19 @@ export function TopBar() {
   const { unreadCount } = useNotifications();
   const { currentOrg, orgs, setCurrentOrgId } = useCurrentOrg();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const handleSwitchOrg = (orgId: string) => {
+    setCurrentOrgId(orgId);
+    queryClient.invalidateQueries();
+    navigate('/dashboard');
+  };
   const initials = user?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'VR';
 
   return (
     <header className="fixed top-0 left-0 right-0 h-[var(--topbar-height)] bg-card border-b border-border z-50 flex items-center px-4 lg:px-6">
       {/* Logo */}
-      <div className="flex items-center gap-2 mr-4 lg:pr-4">
+      <div className="flex items-center gap-2 mr-2 lg:mr-4 lg:pr-4 flex-shrink-0">
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-sm">VR</span>
@@ -30,29 +39,50 @@ export function TopBar() {
         </button>
       </div>
 
-      {/* Org Switcher */}
+      {/* Current clinic – "In: [Name]" at top to show where you are */}
       {orgs?.length > 0 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted text-sm font-medium max-w-[200px] truncate">
-              <span className="truncate">{currentOrg?.name || 'Select clinic'}</span>
-              <ChevronDown className="w-4 h-4 flex-shrink-0" />
-            </button>
-          </DropdownMenuTrigger>
+        <>
+          <button
+            onClick={() => navigate('/organizations')}
+            className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-muted text-sm font-semibold text-foreground max-w-[160px] truncate border border-border/50 bg-muted/30"
+            title={`You're in: ${currentOrg?.name ?? 'Select clinic'}. Tap to switch.`}
+          >
+            <Building2 className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+            <span className="truncate">{currentOrg?.name || 'Select clinic'}</span>
+            <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted text-sm font-semibold text-foreground max-w-[240px] truncate border border-border/50 bg-muted/30"
+                title={`You're in: ${currentOrg?.name ?? 'Select clinic'}. Click to switch.`}
+              >
+                <Building2 className="w-4 h-4 flex-shrink-0 text-primary" />
+                <span className="text-muted-foreground font-normal text-xs mr-0.5">In:</span>
+                <span className="truncate">{currentOrg?.name || 'Select clinic'}</span>
+                <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             {orgs.map((org) => (
               <DropdownMenuItem
                 key={org.id}
-                onClick={() => {
-                  setCurrentOrgId(org.id);
-                  navigate('/dashboard');
-                }}
+                onClick={() => handleSwitchOrg(org.id)}
               >
                 {org.name}
+                {org.id === currentOrg?.id && (
+                  <span className="ml-auto text-xs text-primary font-medium">Active</span>
+                )}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/organizations')}>
+              <Building2 className="w-4 h-4 mr-2" />
+              View all clinics
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </>
       )}
 
       {/* Search */}

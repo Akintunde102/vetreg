@@ -1,15 +1,14 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, PawPrint, Phone, Syringe, ClipboardList, Edit } from 'lucide-react';
-import { mockAnimals, mockTreatments } from '@/lib/mock-data';
+import { ArrowLeft, Calendar, PawPrint, Phone, Syringe, ClipboardList, Edit, Plus } from 'lucide-react';
 import { format, parseISO, differenceInYears, differenceInMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import { NewTreatmentDialog } from '@/components/NewTreatmentDialog';
 import type { Animal } from '@/types/api';
-
-const useMockFallback = false; // Always use API
 
 function getSpeciesEmoji(species: string) {
   switch (species.toLowerCase()) {
@@ -33,24 +32,21 @@ export default function AnimalDetailPage() {
   const { animalId } = useParams();
   const navigate = useNavigate();
   const { currentOrgId } = useCurrentOrg();
+  const [newTreatmentOpen, setNewTreatmentOpen] = useState(false);
 
   const { data: animalData, isLoading, isError } = useQuery({
     queryKey: queryKeys.animals.detail(currentOrgId!, animalId!),
     queryFn: () => api.getAnimal(currentOrgId!, animalId!),
-    enabled: !!currentOrgId && !!animalId && !useMockFallback,
+    enabled: !!currentOrgId && !!animalId,
   });
   const { data: treatmentsData } = useQuery({
     queryKey: [...queryKeys.animals.detail(currentOrgId!, animalId!), 'treatments'],
     queryFn: () => api.getAnimalTreatments(currentOrgId!, animalId!),
-    enabled: !!currentOrgId && !!animalId && !useMockFallback,
+    enabled: !!currentOrgId && !!animalId,
   });
 
-  const animal: (Animal & { client?: Animal['client'] }) | undefined = useMockFallback || isError
-    ? mockAnimals.find((a) => a.id === animalId)
-    : animalData;
-  const treatments = useMockFallback || isError
-    ? mockTreatments.filter((t) => t.animalId === animalId)
-    : Array.isArray(treatmentsData) ? treatmentsData : (treatmentsData?.data ?? []);
+  const animal: (Animal & { client?: Animal['client'] }) | undefined = animalData;
+  const treatments = Array.isArray(treatmentsData) ? treatmentsData : (treatmentsData?.data ?? []);
 
   if (!animal && !isLoading) {
     return (
@@ -64,7 +60,7 @@ export default function AnimalDetailPage() {
     );
   }
 
-  if (isLoading && !useMockFallback) {
+  if (isLoading) {
     return (
       <div className="space-y-5 animate-fade-in">
         <div className="h-8 w-24 bg-muted rounded animate-pulse" />
@@ -153,12 +149,21 @@ export default function AnimalDetailPage() {
 
       {/* Medical History */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Syringe className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">Medical History</h2>
-          <span className="w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
-            {treatments.length}
-          </span>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Syringe className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold text-foreground">Medical History</h2>
+            <span className="w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
+              {treatments.length}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setNewTreatmentOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" /> New Treatment
+          </button>
         </div>
 
         {treatments.length === 0 ? (
@@ -169,7 +174,14 @@ export default function AnimalDetailPage() {
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
             {treatments.map(t => (
-              <div key={t.id} className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-all">
+              <div
+                key={t.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/dashboard/treatments/${t.id}`)}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/dashboard/treatments/${t.id}`)}
+                className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+              >
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-bold text-foreground">{t.diagnosis}</h3>
@@ -202,6 +214,14 @@ export default function AnimalDetailPage() {
           </div>
         )}
       </div>
+
+      <NewTreatmentDialog
+        open={newTreatmentOpen}
+        onOpenChange={setNewTreatmentOpen}
+        animalId={animalId!}
+        animalName={animal?.name}
+        stayOnPage
+      />
     </div>
   );
 }

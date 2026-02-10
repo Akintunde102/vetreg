@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
-import { mockProfile } from '@/lib/mock-data';
 import type { VetProfile } from '@/types/api';
 
 interface AuthContextType {
@@ -25,8 +24,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const hasSupabase = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<VetProfile | null>(hasSupabase ? null : mockProfile);
-  const [isLoading, setIsLoading] = useState(hasSupabase);
+  const [profile, setProfile] = useState<VetProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfileAndSyncToken = useCallback(async (token: string | null) => {
     api.setToken(token);
@@ -44,7 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasSupabase) {
-      api.setToken('mock-token-dev');
       setIsLoading(false);
       return;
     }
@@ -63,11 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfileAndSyncToken]);
 
   const signIn = useCallback(async () => {
-    if (!hasSupabase) {
-      setProfile(mockProfile);
-      api.setToken('mock-token-dev');
-      return;
-    }
+    if (!hasSupabase) return;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -82,8 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refetchProfile = useCallback(async () => {
     if (!hasSupabase) return;
-    const token = (await supabase.auth.getSession()).data.session?.access_token ?? null;
-    await fetchProfileAndSyncToken(token);
+    const { data: { session } } = await supabase.auth.getSession();
+    await fetchProfileAndSyncToken(session?.access_token ?? null);
   }, [fetchProfileAndSyncToken]);
 
   const value: AuthContextType = {

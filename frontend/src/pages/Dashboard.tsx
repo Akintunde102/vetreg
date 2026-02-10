@@ -15,9 +15,6 @@ import { ScheduleCard } from '@/components/dashboard/ScheduleCard';
 import { AddNewDialog } from '@/components/AddNewDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { mockDashboardStats, mockScheduledToday, mockOrganizations } from '@/lib/mock-data';
-
-const useMockFallback = false; // Always use API
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -37,13 +34,20 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: queryKeys.dashboard.stats(currentOrgId!),
     queryFn: () => api.getDashboardStats(currentOrgId!),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
   });
 
   const { data: scheduledData } = useQuery({
     queryKey: queryKeys.dashboard.scheduledToday(currentOrgId!),
     queryFn: () => api.getScheduledToday(currentOrgId!),
-    enabled: !!currentOrgId && !useMockFallback,
+    enabled: !!currentOrgId,
+    refetchInterval: 60000,
+  });
+
+  const { data: followUpsData } = useQuery({
+    queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
+    queryFn: () => api.getFollowUpsToday(currentOrgId!),
+    enabled: !!currentOrgId,
     refetchInterval: 60000,
   });
 
@@ -62,16 +66,22 @@ export default function DashboardPage() {
     },
   });
 
-  const useApiData = !useMockFallback && !!currentOrgId && !statsError;
-  const displayStats = (useApiData && stats) ? stats : mockDashboardStats;
-  const displayOrgs = (orgs?.length ? orgs : mockOrganizations);
-  const scheduled = (useApiData && scheduledData?.treatments) ? scheduledData.treatments : mockScheduledToday;
-  const isLoading = !useMockFallback && statsLoading && !!currentOrgId;
+  const displayStats = stats;
+  const displayOrgs = orgs ?? [];
+  const scheduledList = scheduledData?.treatments ?? [];
+  const followUpsList = followUpsData?.treatments ?? [];
+  const scheduledIds = new Set(scheduledList.map((t) => t.id));
+  const followUpsOnly = followUpsList.filter((t) => !scheduledIds.has(t.id));
+  const upcoming = [
+    ...scheduledList.map((t) => ({ treatment: t, kind: 'scheduled' as const })),
+    ...followUpsOnly.map((t) => ({ treatment: t, kind: 'followUp' as const })),
+  ];
+  const isLoading = !!currentOrgId && statsLoading;
 
   const lastName = user?.fullName?.split(' ').pop() || '';
   const pendingOrgsCount = displayOrgs.filter((o) => o.status === 'PENDING_APPROVAL').length;
 
-  if (!currentOrgId && orgs?.length === 0 && !useMockFallback) {
+  if (!currentOrgId && orgs?.length === 0) {
     return (
       <div className="text-center py-16">
         <p className="text-muted-foreground mb-4">No organizations yet. Create one to get started.</p>
@@ -98,13 +108,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      {isLoading ? (
+      {isLoading || (!!currentOrgId && statsError) ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
-      ) : (
+      ) : displayStats ? (
         <>
           <div className="grid grid-cols-4 gap-2 lg:gap-4">
             <StatsWidget icon={Building2} value={displayOrgs.length} label="Vet Clinics" badge={pendingOrgsCount || undefined} onClick={() => navigate('/organizations')} />
@@ -118,31 +128,39 @@ export default function DashboardPage() {
             <StatsWidget icon={CalendarDays} value={displayStats.treatments.scheduled} label="Upcoming appointments" badge={displayStats.treatments.scheduled} onClick={() => navigate('/dashboard/schedule')} />
           </div>
         </>
-      )}
+      ) : null}
 
-      {/* Unsettled Schedules */}
+      {/* Upcoming: Appointments + Follow-ups */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-foreground">Unsettled schedules</h2>
+            <h2 className="text-lg font-bold text-foreground">Upcoming</h2>
             <span className="w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
-              {scheduled.length}
+              {upcoming.length}
             </span>
           </div>
+          <button
+            onClick={() => navigate('/dashboard/schedule')}
+            className="text-sm text-primary font-medium hover:underline"
+          >
+            View schedule
+          </button>
         </div>
 
-        {scheduled.length === 0 ? (
+        {upcoming.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
             <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No schedules for today</p>
+            <p>No upcoming appointments or follow-ups today</p>
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {scheduled.map((t) => (
+            {upcoming.map(({ treatment: t, kind }) => (
               <ScheduleCard
-                key={t.id}
+                key={t.id + kind}
                 treatment={t}
-                onSettle={!useMockFallback ? () => settleMutation.mutate(t.id) : undefined}
+                kind={kind}
+                onSettle={kind === 'scheduled' ? () => settleMutation.mutate(t.id) : undefined}
+                onView={kind === 'followUp' ? () => navigate(`/dashboard/treatments/${t.id}`) : undefined}
               />
             ))}
           </div>
@@ -150,36 +168,38 @@ export default function DashboardPage() {
       </div>
 
       {/* Don't Forget */}
-      <div className="bg-accent border border-border rounded-xl p-4 lg:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-warning" />
-            <h2 className="text-lg font-bold text-foreground">Don't Forget</h2>
+      {displayStats && (
+        <div className="bg-accent border border-border rounded-xl p-4 lg:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-warning" />
+              <h2 className="text-lg font-bold text-foreground">Don't Forget</h2>
+            </div>
+            <button
+              onClick={() => navigate('/dashboard/schedule')}
+              className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+            >
+              View All <ArrowRight className="w-3 h-3" />
+            </button>
           </div>
-          <button
-            onClick={() => navigate('/dashboard/schedule')}
-            className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
-          >
-            View All <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
-        <ul className="space-y-1.5">
-          <li className="flex items-center gap-2 text-sm text-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span><strong>{displayStats.treatments.followUpsDue}</strong> follow-ups today</span>
-          </li>
-          <li className="flex items-center gap-2 text-sm text-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span><strong>{displayStats.revenue.unpaidInvoices}</strong> unpaid invoices</span>
-          </li>
-          {'vaccinationDue' in (displayStats.animals as Record<string, unknown>) && (displayStats.animals as { vaccinationDue?: number }).vaccinationDue > 0 && (
+          <ul className="space-y-1.5">
             <li className="flex items-center gap-2 text-sm text-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              <span><strong>{(displayStats.animals as { vaccinationDue?: number }).vaccinationDue}</strong> pets due for vaccination</span>
+              <span><strong>{displayStats.treatments.followUpsDue}</strong> follow-ups today</span>
             </li>
-          )}
-        </ul>
-      </div>
+            <li className="flex items-center gap-2 text-sm text-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <span><strong>{displayStats.revenue.unpaidInvoices}</strong> unpaid invoices</span>
+            </li>
+            {'vaccinationDue' in (displayStats.animals as Record<string, unknown>) && (displayStats.animals as { vaccinationDue?: number }).vaccinationDue > 0 && (
+              <li className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span><strong>{(displayStats.animals as { vaccinationDue?: number }).vaccinationDue}</strong> pets due for vaccination</span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
 
       {/* Add New prompt */}
       <div className="text-center text-sm text-muted-foreground pb-2">

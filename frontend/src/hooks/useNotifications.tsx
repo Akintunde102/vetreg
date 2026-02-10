@@ -8,7 +8,7 @@ interface NotificationsContextType {
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
-  const [unreadCount, setUnreadCount] = useState(3); // matches mock unread notifications
+  const [unreadCount, setUnreadCount] = useState(0);
 
   return (
     <NotificationsContext.Provider value={{ unreadCount, setUnreadCount }}>
