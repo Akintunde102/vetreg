@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
@@ -14,6 +15,7 @@ export class VetsService {
   constructor(
     private prisma: PrismaService,
     private auditLogService: AuditLogService,
+    private configService: ConfigService,
   ) {}
 
   async completeProfile(vetId: string, dto: CompleteProfileDto) {
@@ -94,7 +96,16 @@ export class VetsService {
       });
     }
 
-    return vet;
+    const masterAdminEmails: string[] =
+      this.configService.get<string[]>('masterAdminEmails') ?? [];
+    const emailInList =
+      vet.email &&
+      masterAdminEmails.includes(vet.email.trim().toLowerCase());
+
+    return {
+      ...vet,
+      isMasterAdmin: vet.isMasterAdmin || emailInList,
+    };
   }
 
   async getApprovalStatus(vetId: string) {

@@ -31,4 +31,8 @@ export const queryKeys = {
     scheduledToday: (orgId: string) => ['dashboard', 'scheduled-today', orgId] as const,
     followUpsToday: (orgId: string) => ['dashboard', 'follow-ups-today', orgId] as const,
   },
+  admin: {
+    pendingVets: ['admin', 'pending-vets'] as const,
+    pendingOrgs: ['admin', 'pending-orgs'] as const,
+  },
 };

@@ -22,6 +22,7 @@ export interface VetProfile {
   practiceType?: string;
   status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   profileCompleted: boolean;
+  isMasterAdmin?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,7 +35,7 @@ export interface Organization {
   state?: string;
   country?: string;
   logoUrl?: string;
-  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   paymentTerms?: string;
   createdAt: string;
   updatedAt: string;
@@ -42,6 +43,12 @@ export interface Organization {
     clients: number;
     animals: number;
   };
+}
+
+/** Organization with creator and member count (admin pending-approvals list) */
+export interface PendingOrganization extends Organization {
+  creator?: { id: string; fullName: string; email: string; phoneNumber?: string };
+  _count?: { memberships: number };
 }
 
 export interface Client {

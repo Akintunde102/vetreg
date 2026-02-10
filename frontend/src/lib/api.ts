@@ -1,6 +1,7 @@
 import type {
   VetProfile,
   Organization,
+  PendingOrganization,
   Animal,
   Client,
   Treatment,
@@ -210,6 +211,69 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+  }
+
+  // Site Admin (Master Admin only)
+  async getPendingVetApprovals(): Promise<VetProfile[]> {
+    const res = await this.request<VetProfile[] | { data: VetProfile[] }>('/vets/pending-approvals');
+    return Array.isArray(res) ? res : res.data;
+  }
+
+  async approveVet(vetId: string): Promise<VetProfile> {
+    const res = await this.request<VetProfile | { data: VetProfile }>(`/vets/${vetId}/approve`, { method: 'PATCH' });
+    return 'data' in res ? res.data : res;
+  }
+
+  async rejectVet(vetId: string, reason: string): Promise<VetProfile> {
+    const res = await this.request<VetProfile | { data: VetProfile }>(`/vets/${vetId}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+    return 'data' in res ? res.data : res;
+  }
+
+  async suspendVet(vetId: string, reason: string): Promise<VetProfile> {
+    const res = await this.request<VetProfile | { data: VetProfile }>(`/vets/${vetId}/suspend`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+    return 'data' in res ? res.data : res;
+  }
+
+  async reactivateVet(vetId: string): Promise<VetProfile> {
+    const res = await this.request<VetProfile | { data: VetProfile }>(`/vets/${vetId}/reactivate`, { method: 'PATCH' });
+    return 'data' in res ? res.data : res;
+  }
+
+  async getPendingOrgApprovals(): Promise<PendingOrganization[]> {
+    const res = await this.request<PendingOrganization[] | { data: PendingOrganization[] }>('/orgs/admin/pending-approvals');
+    return Array.isArray(res) ? res : res.data ?? [];
+  }
+
+  async approveOrganization(orgId: string): Promise<Organization> {
+    const res = await this.request<{ data: Organization }>(`/orgs/admin/${orgId}/approve`, { method: 'POST' });
+    return res.data;
+  }
+
+  async rejectOrganization(orgId: string, reason: string): Promise<Organization> {
+    const res = await this.request<{ data: Organization }>(`/orgs/admin/${orgId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    return res.data;
+  }
+
+  async suspendOrganization(orgId: string, reason: string): Promise<Organization> {
+    const res = await this.request<{ data: Organization }>(`/orgs/admin/${orgId}/suspend`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    return res.data;
+  }
+
+  async reactivateOrganization(orgId: string): Promise<Organization> {
+    const res = await this.request<{ data: Organization }>(`/orgs/admin/${orgId}/reactivate`, { method: 'POST' });
+    return res.data;
   }
 }
 

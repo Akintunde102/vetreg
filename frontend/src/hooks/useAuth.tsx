@@ -14,8 +14,10 @@ interface AuthContextType {
   isRejected: boolean;
   isSuspended: boolean;
   profileCompleted: boolean;
+  isMasterAdmin: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  refetchProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -78,6 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  const refetchProfile = useCallback(async () => {
+    if (!hasSupabase) return;
+    const token = (await supabase.auth.getSession()).data.session?.access_token ?? null;
+    await fetchProfileAndSyncToken(token);
+  }, [fetchProfileAndSyncToken]);
+
   const value: AuthContextType = {
     user: profile,
     profile,
@@ -88,8 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isRejected: profile?.status === 'REJECTED',
     isSuspended: profile?.status === 'SUSPENDED',
     profileCompleted: profile?.profileCompleted ?? false,
+    isMasterAdmin: profile?.isMasterAdmin ?? false,
     signIn,
     signOut,
+    refetchProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

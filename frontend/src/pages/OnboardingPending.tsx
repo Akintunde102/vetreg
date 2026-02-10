@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Mail } from 'lucide-react';
 
 export default function OnboardingPendingPage() {
-  const { signOut } = useAuth();
+  const { signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
 
   const { data: status, refetch, isRefetching } = useQuery({
@@ -16,13 +17,22 @@ export default function OnboardingPendingPage() {
     refetchInterval: 30000,
   });
 
-  if (status?.status === 'APPROVED') {
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
-  if (status?.status === 'REJECTED') {
-    navigate('/account/rejected', { replace: true });
-    return null;
+  useEffect(() => {
+    if (status?.status === 'APPROVED') {
+      refetchProfile().then(() => navigate('/dashboard', { replace: true }));
+      return;
+    }
+    if (status?.status === 'REJECTED') {
+      refetchProfile().then(() => navigate('/account/rejected', { replace: true }));
+    }
+  }, [status?.status, refetchProfile, navigate]);
+
+  if (status?.status === 'APPROVED' || status?.status === 'REJECTED') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="animate-spin w-10 h-10 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
   }
 
   return (

@@ -7,7 +7,9 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { OrgProvider } from "@/hooks/useCurrentOrg";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminRoute } from "@/components/auth/AdminRoute";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 import LoginPage from "@/pages/Login";
 import AuthCallbackPage from "@/pages/AuthCallback";
 import OnboardingProfilePage from "@/pages/OnboardingProfile";
@@ -31,6 +33,9 @@ import MorePage from "@/pages/More";
 import NotificationsPage from "@/pages/Notifications";
 import LandingPage from "@/pages/Landing";
 import NotFound from "@/pages/NotFound";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminVets from "@/pages/admin/AdminVets";
+import AdminOrganizations from "@/pages/admin/AdminOrganizations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +64,13 @@ const App = () => (
                   <Route path="/account/suspended" element={<AccountSuspendedPage />} />
                 </Route>
                 <Route element={<ProtectedRoute />}>
+                  <Route element={<AdminRoute />}>
+                    <Route element={<AdminLayout />}>
+                      <Route path="/admin" element={<AdminDashboard />} />
+                      <Route path="/admin/vets" element={<AdminVets />} />
+                      <Route path="/admin/organizations" element={<AdminOrganizations />} />
+                    </Route>
+                  </Route>
                   <Route element={<DashboardLayout />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/dashboard/clients" element={<ClientsPage />} />

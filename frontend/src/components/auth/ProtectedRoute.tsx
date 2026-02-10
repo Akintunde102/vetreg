@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ requireApproved = true }: ProtectedRouteProps = {}) {
-  const { isAuthenticated, isLoading, isApproved, isPending, isRejected, isSuspended, profileCompleted } = useAuth();
+  const { isAuthenticated, isLoading, isApproved, isPending, isRejected, isSuspended, profileCompleted, isMasterAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,7 +19,7 @@ export function ProtectedRoute({ requireApproved = true }: ProtectedRouteProps =
       return;
     }
 
-    if (requireApproved) {
+    if (requireApproved && !isMasterAdmin) {
       if (!profileCompleted) {
         navigate('/onboarding/profile', { replace: true });
         return;
@@ -38,7 +38,7 @@ export function ProtectedRoute({ requireApproved = true }: ProtectedRouteProps =
       }
       if (!isApproved) return;
     }
-  }, [isLoading, isAuthenticated, isApproved, isPending, isRejected, isSuspended, profileCompleted, requireApproved, navigate, location]);
+  }, [isLoading, isAuthenticated, isApproved, isPending, isRejected, isSuspended, profileCompleted, requireApproved, isMasterAdmin, navigate, location]);
 
   if (isLoading) {
     return (
@@ -48,7 +48,8 @@ export function ProtectedRoute({ requireApproved = true }: ProtectedRouteProps =
     );
   }
 
-  if (!isAuthenticated || (requireApproved && !isApproved && !isPending && !isRejected && !isSuspended)) {
+  const allowed = isAuthenticated && (isMasterAdmin || !requireApproved || isApproved || isPending || isRejected || isSuspended);
+  if (!allowed) {
     return null;
   }
 

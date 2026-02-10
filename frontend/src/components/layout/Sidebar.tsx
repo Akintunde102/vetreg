@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, PawPrint, Pill, CalendarDays,
-  DollarSign, Building2, Settings, ChevronLeft, ChevronRight, Bell, BarChart3,
+  DollarSign, Building2, Settings, ChevronLeft, ChevronRight, Bell, BarChart3, ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAuth } from '@/hooks/useAuth';
 
 const mainNav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,6 +28,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const { unreadCount } = useNotifications();
+  const { isMasterAdmin } = useAuth();
 
   return (
     <aside
@@ -57,6 +59,27 @@ export function Sidebar() {
             );
           })}
         </div>
+
+        {isMasterAdmin && (
+          <>
+            <div className="border-t border-sidebar-border mx-4 my-3" />
+            <div className="px-3 mb-2">
+              {!collapsed && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Admin</p>}
+              <NavLink
+                to="/admin"
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg mx-1 mb-0.5 text-sm font-medium transition-colors',
+                  location.pathname.startsWith('/admin')
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
+                    : 'text-sidebar-foreground hover:bg-muted'
+                )}
+              >
+                <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span>Site Admin</span>}
+              </NavLink>
+            </div>
+          </>
+        )}
 
         <div className="border-t border-sidebar-border mx-4 my-3" />
 

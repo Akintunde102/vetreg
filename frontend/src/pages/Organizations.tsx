@@ -7,16 +7,16 @@ import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useOrgStore } from '@/lib/stores/org-store';
 import { mockOrganizations } from '@/lib/mock-data';
-import { useToast } from '@/hooks/use-toast';
+import { AddNewDialog } from '@/components/AddNewDialog';
 
 const useMockFallback = false; // Always use API
 
 export default function OrganizationsPage() {
   const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setCurrentOrgId } = useOrgStore();
-  const { toast } = useToast();
 
   const { data: orgs = [], isError } = useQuery({
     queryKey: queryKeys.orgs.all,
@@ -48,10 +48,10 @@ export default function OrganizationsPage() {
           <p className="text-sm text-muted-foreground mt-1">Manage the veterinary clinics in your network.</p>
         </div>
         <button
-          onClick={() => toast({ title: 'Add New', description: 'Use the Add New dialog to create a clinic.' })}
+          onClick={() => setAddOpen(true)}
           className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
         >
-          <Plus className="w-4 h-4" /> Add New
+          <Plus className="w-4 h-4" /> Add New Clinic
         </button>
       </div>
 
@@ -133,11 +133,21 @@ export default function OrganizationsPage() {
       )}
 
       <button
-        onClick={() => toast({ title: 'Add New', description: 'Use the Add New button on Dashboard.' })}
+        onClick={() => setAddOpen(true)}
         className="sm:hidden fixed right-4 bottom-[calc(var(--bottomnav-height)+16px)] w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center z-40"
+        aria-label="Add new clinic"
       >
         <Plus className="w-6 h-6" />
       </button>
+
+      <AddNewDialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open);
+          if (!open) queryClient.invalidateQueries({ queryKey: queryKeys.orgs.all });
+        }}
+        showVetClinic
+      />
     </div>
   );
 }

@@ -27,21 +27,24 @@ export default function AuthCallbackPage() {
         api.setToken(session.access_token);
         const vet = await api.getProfile() as VetProfile;
 
-        if (!vet.profileCompleted) {
-          navigate('/onboarding/profile');
-          return;
-        }
-        if (vet.status === 'PENDING_APPROVAL') {
-          navigate('/onboarding/pending');
-          return;
-        }
-        if (vet.status === 'REJECTED') {
-          navigate('/account/rejected');
-          return;
-        }
-        if (vet.status === 'SUSPENDED') {
-          navigate('/account/suspended');
-          return;
+        // Master admins can always reach the app (and /admin) regardless of vet status
+        if (!vet.isMasterAdmin) {
+          if (!vet.profileCompleted) {
+            navigate('/onboarding/profile');
+            return;
+          }
+          if (vet.status === 'PENDING_APPROVAL') {
+            navigate('/onboarding/pending');
+            return;
+          }
+          if (vet.status === 'REJECTED') {
+            navigate('/account/rejected');
+            return;
+          }
+          if (vet.status === 'SUSPENDED') {
+            navigate('/account/suspended');
+            return;
+          }
         }
 
         const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
