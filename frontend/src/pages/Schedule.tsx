@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useMemo } from 'react';
+import { format, isToday } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { AddNewDialog } from '@/components/AddNewDialog';
 import { Search, CalendarDays, Clock, ChevronRight, AlertCircle, ArrowRight, Plus } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -11,6 +12,12 @@ import { cn } from '@/lib/utils';
 import { mockAppointments } from '@/lib/mock-data';
 import { parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import type { Treatment } from '@/types/api';
+
+const useMockFallback = false; // Always use API
 
 function getSpeciesEmoji(species: string) {
   switch (species.toLowerCase()) {
@@ -30,7 +37,42 @@ export default function SchedulePage() {
   const [addOpen, setAddOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const appointments = mockAppointments;
+  const { currentOrgId } = useCurrentOrg();
+
+  const isSelectedToday = isToday(date);
+  const fromStr = format(date, 'yyyy-MM-dd');
+  const toStr = format(date, 'yyyy-MM-dd');
+
+  const { data: scheduledTodayData } = useQuery({
+    queryKey: queryKeys.dashboard.scheduledToday(currentOrgId!),
+    queryFn: () => api.getScheduledToday(currentOrgId!),
+    enabled: !!currentOrgId && !useMockFallback && isSelectedToday,
+  });
+  const { data: followUpsData } = useQuery({
+    queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
+    queryFn: () => api.getFollowUpsToday(currentOrgId!),
+    enabled: !!currentOrgId && !useMockFallback && isSelectedToday,
+  });
+  const { data: scheduledListData } = useQuery({
+    queryKey: queryKeys.treatments.scheduledList(currentOrgId!, fromStr, toStr),
+    queryFn: () =>
+      api.getScheduledList(currentOrgId!, { from: fromStr, to: toStr, limit: '100' }),
+    enabled: !!currentOrgId && !useMockFallback && !isSelectedToday,
+  });
+
+  const appointments: Treatment[] = useMockFallback || !currentOrgId
+    ? mockAppointments
+    : useMemo(() => {
+        if (isSelectedToday) {
+          const scheduled = (scheduledTodayData as { treatments?: Treatment[] })?.treatments ?? [];
+          const followUps = (followUpsData as { treatments?: Treatment[] })?.treatments ?? [];
+          const ids = new Set(scheduled.map((t) => t.id));
+          const combined = [...scheduled];
+          for (const t of followUps) if (!ids.has(t.id)) { combined.push(t); ids.add(t.id); }
+          return combined;
+        }
+        return scheduledListData?.treatments ?? [];
+      }, [isSelectedToday, scheduledTodayData, followUpsData, scheduledListData]);
 
   const filtered = appointments.filter(a => {
     if (!search) return true;
@@ -74,7 +116,9 @@ export default function SchedulePage() {
         <PopoverTrigger asChild>
           <button className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-2.5 hover:border-primary/30 transition-colors">
             <CalendarDays className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-foreground">Today, {format(date, 'MMM d')}</span>
+            <span className="text-sm text-foreground">
+              {isSelectedToday ? 'Today' : format(date, 'EEEE')}, {format(date, 'MMM d')}
+            </span>
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">

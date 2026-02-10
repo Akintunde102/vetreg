@@ -77,8 +77,16 @@ export class TreatmentsController {
     @Param('orgId') orgId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('from') fromDate?: string,
+    @Query('to') toDate?: string,
   ) {
-    return this.treatmentsService.getScheduledTreatments(orgId, page, limit);
+    return this.treatmentsService.getScheduledTreatments(
+      orgId,
+      page,
+      limit,
+      fromDate,
+      toDate,
+    );
   }
 
   @Get('scheduled/today')

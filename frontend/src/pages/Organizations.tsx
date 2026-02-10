@@ -1,33 +1,60 @@
 import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Building2, ArrowRight, AlertCircle } from 'lucide-react';
-import { mockOrganizations } from '@/lib/mock-data';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useOrgStore } from '@/lib/stores/org-store';
+import { mockOrganizations } from '@/lib/mock-data';
+import { useToast } from '@/hooks/use-toast';
+
+const useMockFallback = false; // Always use API
 
 export default function OrganizationsPage() {
   const [search, setSearch] = useState('');
-  const orgs = mockOrganizations;
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { setCurrentOrgId } = useOrgStore();
+  const { toast } = useToast();
 
-  const filtered = orgs.filter(org =>
-    org.name.toLowerCase().includes(search.toLowerCase()) ||
-    org.city.toLowerCase().includes(search.toLowerCase())
+  const { data: orgs = [], isError } = useQuery({
+    queryKey: queryKeys.orgs.all,
+    queryFn: () => api.getOrganizations(),
+    staleTime: 5 * 60 * 1000,
+    enabled: !useMockFallback,
+  });
+
+  const displayOrgs = (useMockFallback || isError) ? mockOrganizations : orgs;
+  const filtered = displayOrgs.filter(
+    (org) =>
+      org.name.toLowerCase().includes(search.toLowerCase()) ||
+      (org.address?.toLowerCase().includes(search.toLowerCase())) ||
+      org.city.toLowerCase().includes(search.toLowerCase())
   );
-  const pending = orgs.filter(o => o.status === 'PENDING_APPROVAL');
+  const pending = filtered.filter((o) => o.status === 'PENDING_APPROVAL');
+
+  const handleSwitchOrg = (orgId: string) => {
+    setCurrentOrgId(orgId);
+    queryClient.invalidateQueries();
+    navigate('/dashboard');
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Vet Clinics</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage the veterinary clinics in your network.</p>
         </div>
-        <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity">
+        <button
+          onClick={() => toast({ title: 'Add New', description: 'Use the Add New dialog to create a clinic.' })}
+          className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
+        >
           <Plus className="w-4 h-4" /> Add New
         </button>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
@@ -39,9 +66,8 @@ export default function OrganizationsPage() {
         />
       </div>
 
-      {/* Clinic Cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(org => (
+        {filtered.map((org) => (
           <div key={org.id} className="bg-card border border-border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all group">
             <div className="flex items-start gap-3 mb-3">
               <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center relative flex-shrink-0">
@@ -78,26 +104,38 @@ export default function OrganizationsPage() {
               </span>
             </div>
 
-            <button className="mt-3 w-full py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg hover:bg-accent transition-colors flex items-center justify-center gap-1">
+            <button
+              onClick={() => handleSwitchOrg(org.id)}
+              className="mt-3 w-full py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg hover:bg-accent transition-colors flex items-center justify-center gap-1"
+            >
               View <ArrowRight className="w-3 h-3" />
             </button>
           </div>
         ))}
       </div>
 
-      {/* Pending Section */}
       {pending.length > 0 && (
         <div className="bg-warning/5 border border-warning/20 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-5 h-5 text-warning" />
-            <h3 className="font-semibold text-foreground">Pending Verification ({pending.length})</h3>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-warning" />
+              <h3 className="font-semibold text-foreground">Pending Verification ({pending.length})</h3>
+            </div>
+            <button
+              onClick={() => navigate('/organizations?status=pending')}
+              className="text-sm text-primary font-medium hover:underline"
+            >
+              View All →
+            </button>
           </div>
           <p className="text-sm text-muted-foreground">New clinics awaiting approval</p>
         </div>
       )}
 
-      {/* Mobile FAB */}
-      <button className="sm:hidden fixed right-4 bottom-[calc(var(--bottomnav-height)+16px)] w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center z-40">
+      <button
+        onClick={() => toast({ title: 'Add New', description: 'Use the Add New button on Dashboard.' })}
+        className="sm:hidden fixed right-4 bottom-[calc(var(--bottomnav-height)+16px)] w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center z-40"
+      >
         <Plus className="w-6 h-6" />
       </button>
     </div>

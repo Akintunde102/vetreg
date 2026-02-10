@@ -1,8 +1,15 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Calendar, PawPrint, Phone, Syringe, ClipboardList, Edit } from 'lucide-react';
 import { mockAnimals, mockTreatments } from '@/lib/mock-data';
 import { format, parseISO, differenceInYears, differenceInMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import type { Animal } from '@/types/api';
+
+const useMockFallback = false; // Always use API
 
 function getSpeciesEmoji(species: string) {
   switch (species.toLowerCase()) {
@@ -25,10 +32,27 @@ function getAge(dob?: string) {
 export default function AnimalDetailPage() {
   const { animalId } = useParams();
   const navigate = useNavigate();
-  const animal = mockAnimals.find(a => a.id === animalId);
-  const treatments = mockTreatments.filter(t => t.animalId === animalId);
+  const { currentOrgId } = useCurrentOrg();
 
-  if (!animal) {
+  const { data: animalData, isLoading, isError } = useQuery({
+    queryKey: queryKeys.animals.detail(currentOrgId!, animalId!),
+    queryFn: () => api.getAnimal(currentOrgId!, animalId!),
+    enabled: !!currentOrgId && !!animalId && !useMockFallback,
+  });
+  const { data: treatmentsData } = useQuery({
+    queryKey: [...queryKeys.animals.detail(currentOrgId!, animalId!), 'treatments'],
+    queryFn: () => api.getAnimalTreatments(currentOrgId!, animalId!),
+    enabled: !!currentOrgId && !!animalId && !useMockFallback,
+  });
+
+  const animal: (Animal & { client?: Animal['client'] }) | undefined = useMockFallback || isError
+    ? mockAnimals.find((a) => a.id === animalId)
+    : animalData;
+  const treatments = useMockFallback || isError
+    ? mockTreatments.filter((t) => t.animalId === animalId)
+    : Array.isArray(treatmentsData) ? treatmentsData : (treatmentsData?.data ?? []);
+
+  if (!animal && !isLoading) {
     return (
       <div className="text-center py-20 text-muted-foreground animate-fade-in">
         <PawPrint className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -36,6 +60,15 @@ export default function AnimalDetailPage() {
         <button onClick={() => navigate('/dashboard/animals')} className="mt-4 text-primary font-medium hover:underline">
           Back to Animals
         </button>
+      </div>
+    );
+  }
+
+  if (isLoading && !useMockFallback) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <div className="h-8 w-24 bg-muted rounded animate-pulse" />
+        <div className="h-40 bg-card border border-border rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -93,21 +126,28 @@ export default function AnimalDetailPage() {
       <div className="bg-card border border-border rounded-xl p-4">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Owner</p>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center text-sm font-bold text-primary">
-            {animal.client.firstName[0]}{animal.client.lastName[0]}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-foreground">{animal.client.firstName} {animal.client.lastName}</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Phone className="w-3 h-3" /> {animal.client.phoneNumber}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/dashboard/clients')}
-            className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-          >
-            View
-          </button>
+          {animal.client && (
+            <>
+              <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center text-sm font-bold text-primary">
+                {animal.client.firstName[0]}{animal.client.lastName[0]}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-foreground">{animal.client.firstName} {animal.client.lastName}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Phone className="w-3 h-3" /> {animal.client.phoneNumber}
+                </p>
+              </div>
+            </>
+          )}
+          {!animal.client && <p className="text-sm text-muted-foreground">Owner not loaded</p>}
+          {animal.client && (
+            <button
+              onClick={() => navigate(`/dashboard/clients/${animal.client!.id}`)}
+              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            >
+              View
+            </button>
+          )}
         </div>
       </div>
 

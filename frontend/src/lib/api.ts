@@ -35,7 +35,15 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      throw new ApiError(response.status, error.error?.code || 'UNKNOWN', error.error?.message || error.message);
+      const apiError = new ApiError(response.status, error.error?.code || 'UNKNOWN', error.error?.message || error.message);
+      if (response.status === 401) {
+        const path = window.location.pathname;
+        const isPublic = path === '/' || path === '/login' || path === '/signup' || path.startsWith('/auth/');
+        if (!isPublic) {
+          window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
+        }
+      }
+      throw apiError;
     }
 
     return response.json();
@@ -43,8 +51,8 @@ class ApiClient {
 
   // Auth / Profile
   async getProfile(): Promise<VetProfile> {
-    const res = await this.request<{ vet: VetProfile }>('/vets/profile');
-    return res.vet;
+    const res = await this.request<{ vet?: VetProfile; data?: VetProfile }>('/vets/profile');
+    return res.vet ?? res.data!;
   }
 
   async getApprovalStatus() {
@@ -52,27 +60,30 @@ class ApiClient {
   }
 
   async completeProfile(data: Partial<VetProfile>) {
-    return this.request<{ vet: VetProfile }>('/vets/profile/complete', {
+    const res = await this.request<{ vet?: VetProfile; data?: VetProfile }>('/vets/profile/complete', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    return res.vet ?? res.data ?? (res as unknown as VetProfile);
   }
 
   // Organizations
   async getOrganizations(): Promise<Organization[]> {
     const res = await this.request<{ data: Organization[] }>('/orgs');
-    return res.data;
+    return 'data' in res ? res.data : (res as unknown as Organization[]);
   }
 
-  async getOrganization(orgId: string): Promise<Organization> {
-    return this.request<Organization>(`/orgs/${orgId}`);
-  }
-
-  async createOrganization(data: Partial<Organization>) {
-    return this.request<Organization>('/orgs', {
+  async createOrganization(data: { name: string; address: string; city: string; state: string; country?: string; phoneNumber: string; type: string; paymentTerms?: string; description?: string; email?: string; website?: string }) {
+    const res = await this.request<{ data: Organization }>('/orgs', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    return 'data' in res ? res.data : (res as unknown as Organization);
+  }
+
+  async getOrganization(orgId: string): Promise<Organization> {
+    const res = await this.request<{ data: Organization }>(`/orgs/${orgId}`);
+    return res.data;
   }
 
   // Dashboard
@@ -84,6 +95,18 @@ class ApiClient {
     return this.request<{ treatments: Treatment[] }>(`/orgs/${orgId}/treatments/scheduled/today`);
   }
 
+  async getScheduledList(
+    orgId: string,
+    params?: Record<string, string>,
+  ): Promise<{ treatments: Treatment[]; pagination?: { page: number; limit: number; total: number; totalPages: number } }> {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    const res = await this.request<
+      | { treatments: Treatment[]; pagination?: { page: number; limit: number; total: number; totalPages: number } }
+      | { success: boolean; data: { treatments: Treatment[]; pagination?: { page: number; limit: number; total: number; totalPages: number } } }
+    >(`/orgs/${orgId}/treatments/scheduled/list${query}`);
+    return 'data' in res ? res.data : res;
+  }
+
   async getFollowUpsToday(orgId: string) {
     return this.request<{ treatments: Treatment[]; count: number }>(`/orgs/${orgId}/treatments/follow-ups/today`);
   }
@@ -91,37 +114,91 @@ class ApiClient {
   // Animals
   async getAnimals(orgId: string, params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return this.request<PaginatedResponse<Animal>>(`/orgs/${orgId}/animals${query}`);
+    const res = await this.request<{ data: PaginatedResponse<Animal> }>(`/orgs/${orgId}/animals${query}`);
+    return res.data;
+  }
+
+  async createAnimal(orgId: string, data: Record<string, unknown>) {
+    const res = await this.request<{ data: Animal }>('/orgs/' + orgId + '/animals', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return 'data' in res ? res.data : (res as unknown as Animal);
   }
 
   async getAnimal(orgId: string, animalId: string) {
-    return this.request<Animal>(`/orgs/${orgId}/animals/${animalId}`);
+    const res = await this.request<{ data: Animal }>(`/orgs/${orgId}/animals/${animalId}`);
+    return 'data' in res ? res.data : (res as unknown as Animal);
   }
 
   async getAnimalTreatments(orgId: string, animalId: string, params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return this.request<PaginatedResponse<Treatment>>(`/orgs/${orgId}/animals/${animalId}/treatments${query}`);
+    const res = await this.request<{ data: PaginatedResponse<Treatment> }>(`/orgs/${orgId}/animals/${animalId}/treatments${query}`);
+    return 'data' in res ? res.data : (res as unknown as PaginatedResponse<Treatment>);
   }
 
   // Clients
   async getClients(orgId: string, params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return this.request<PaginatedResponse<Client>>(`/orgs/${orgId}/clients${query}`);
+    const res = await this.request<{ data: PaginatedResponse<Client> } | { data: { clients: Client[]; pagination: { page: number; limit: number; total: number; totalPages: number } } }>(`/orgs/${orgId}/clients${query}`);
+    const raw = 'data' in res ? res.data : res;
+    if (raw && typeof raw === 'object' && 'clients' in raw && 'pagination' in raw) {
+      const { clients, pagination } = raw as { clients: Client[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
+      return { data: clients, meta: { page: pagination.page, limit: pagination.limit, totalCount: pagination.total, totalPages: pagination.totalPages } };
+    }
+    return raw as PaginatedResponse<Client>;
+  }
+
+  async getClient(orgId: string, clientId: string): Promise<Client> {
+    const res = await this.request<{ data: Client } | Client>(`/orgs/${orgId}/clients/${clientId}`);
+    return 'data' in res ? res.data : res;
+  }
+
+  async getClientAnimals(orgId: string, clientId: string) {
+    const res = await this.request<{ data: Animal[] } | Animal[]>(`/orgs/${orgId}/clients/${clientId}/animals`);
+    return Array.isArray(res) ? res : res.data;
+  }
+
+  async createClient(orgId: string, data: { firstName: string; lastName: string; phoneNumber: string; email?: string; address?: string; city?: string; state?: string }) {
+    const res = await this.request<{ data: Client }>('/orgs/' + orgId + '/clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return 'data' in res ? res.data : (res as unknown as Client);
   }
 
   // Revenue
   async getRevenue(orgId: string, params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return this.request<RevenueData>(`/orgs/${orgId}/revenue${query}`);
+    const res = await this.request<{ data: RevenueData } | RevenueData>(`/orgs/${orgId}/revenue${query}`);
+    return 'data' in res ? res.data : res;
   }
 
   // Treatments
   async getTreatments(orgId: string, params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return this.request<PaginatedResponse<Treatment>>(`/orgs/${orgId}/treatments${query}`);
+    const res = await this.request<{ data: PaginatedResponse<Treatment> }>(`/orgs/${orgId}/treatments${query}`);
+    return res.data;
   }
 
-  async markPayment(orgId: string, treatmentId: string, data: { amountPaid: number; paidBy: string; paymentNotes?: string }) {
+  async getTreatment(orgId: string, treatmentId: string) {
+    const res = await this.request<{ data: Treatment }>(`/orgs/${orgId}/treatments/${treatmentId}`);
+    return res.data;
+  }
+
+  async createTreatment(orgId: string, data: Record<string, unknown>) {
+    const res = await this.request<{ data: Treatment }>('/orgs/' + orgId + '/treatments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return 'data' in res ? res.data : (res as unknown as Treatment);
+  }
+
+  async markPayment(
+    orgId: string,
+    treatmentId: string,
+    data: { paymentStatus: 'PAID' | 'OWED' | 'PARTIAL'; amountPaid: number; paymentNotes?: string },
+  ) {
     return this.request(`/orgs/${orgId}/treatments/${treatmentId}/payment`, {
       method: 'POST',
       body: JSON.stringify(data),

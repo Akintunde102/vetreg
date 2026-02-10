@@ -7,22 +7,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 
-type FormType = 'client' | 'animal' | 'appointment' | 'payment' | 'quick';
+type FormType = 'client' | 'animal' | 'appointment' | 'payment' | 'org' | 'quick';
 
 interface AddNewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultType?: FormType;
+  showVetClinic?: boolean;
 }
 
-const quickOptions: { label: string; value: FormType; emoji: string }[] = [
+const baseQuickOptions: { label: string; value: FormType; emoji: string }[] = [
   { label: 'New Client', value: 'client', emoji: '👤' },
   { label: 'New Animal', value: 'animal', emoji: '🐾' },
   { label: 'New Appointment', value: 'appointment', emoji: '📅' },
   { label: 'Record Payment', value: 'payment', emoji: '💰' },
 ];
 
-export function AddNewDialog({ open, onOpenChange, defaultType = 'quick' }: AddNewDialogProps) {
+export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', showVetClinic = false }: AddNewDialogProps) {
+  const quickOptions = showVetClinic
+    ? [{ label: 'Add Vet Clinic', value: 'org' as FormType, emoji: '🏥' }, ...baseQuickOptions]
+    : baseQuickOptions;
   const [formType, setFormType] = useState<FormType>(defaultType);
   const { toast } = useToast();
 
@@ -38,6 +42,7 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick' }: AddN
       animal: 'Animal registered',
       appointment: 'Appointment created',
       payment: 'Payment recorded',
+      org: 'Vet clinic created',
       quick: '',
     };
     toast({ title: labels[formType] || 'Saved', description: 'This is a demo. Connect a backend to persist data.' });
@@ -78,6 +83,7 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick' }: AddN
             {formType === 'animal' && 'Register Animal'}
             {formType === 'appointment' && 'Create Appointment'}
             {formType === 'payment' && 'Record Payment'}
+            {formType === 'org' && 'Add Vet Clinic'}
           </DialogTitle>
           <DialogDescription>Fill in the details below. Data is demo-only until a backend is connected.</DialogDescription>
         </DialogHeader>
@@ -172,6 +178,44 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick' }: AddN
               <div className="space-y-1.5">
                 <Label htmlFor="apptNotes">Notes</Label>
                 <Textarea id="apptNotes" placeholder="Additional notes..." />
+              </div>
+            </>
+          )}
+
+          {formType === 'org' && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="orgName">Clinic Name</Label>
+                <Input id="orgName" placeholder="e.g. Greenleaf Veterinary Clinic" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="orgAddress">Address</Label>
+                <Input id="orgAddress" placeholder="Street address" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="orgCity">City</Label>
+                  <Input id="orgCity" placeholder="City" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="orgState">State</Label>
+                  <Input id="orgState" placeholder="State" required />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="orgPhone">Phone Number</Label>
+                <Input id="orgPhone" placeholder="+234..." required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="orgType">Type</Label>
+                <Select>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CLINIC">Clinic</SelectItem>
+                    <SelectItem value="HOSPITAL">Hospital</SelectItem>
+                    <SelectItem value="MOBILE">Mobile</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </>
           )}

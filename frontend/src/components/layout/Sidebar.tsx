@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, PawPrint, Pill, CalendarDays,
-  DollarSign, Building2, Settings, ChevronLeft, ChevronRight, Bell,
+  DollarSign, Building2, Settings, ChevronLeft, ChevronRight, Bell, BarChart3,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -14,12 +14,13 @@ const mainNav = [
   { to: '/dashboard/treatments', icon: Pill, label: 'Treatments' },
   { to: '/dashboard/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/dashboard/revenue', icon: DollarSign, label: 'Revenue' },
+  { to: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
 ];
 
 const orgNav = [
   { to: '/organizations', icon: Building2, label: 'Clinics' },
   { to: '/notifications', icon: Bell, label: 'Notifications', showBadge: true },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function Sidebar() {

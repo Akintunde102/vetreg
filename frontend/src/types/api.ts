@@ -53,6 +53,7 @@ export interface Client {
   city?: string;
   address?: string;
   createdAt: string;
+  _count?: { animals: number };
 }
 
 export interface Animal {

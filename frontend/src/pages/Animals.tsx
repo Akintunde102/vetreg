@@ -1,19 +1,23 @@
 import { useState } from 'react';
-import { Search, PawPrint, Plus, ChevronRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Search, PawPrint, Plus, ChevronRight, MessageCircle } from 'lucide-react';
 import { mockAnimals } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { AddNewDialog } from '@/components/AddNewDialog';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { AlertCircle } from 'lucide-react';
 
-const tabs = [
-  { label: 'All', value: 'ALL', count: 62 },
-  { label: 'Dogs', value: 'Dog', count: 32 },
-  { label: 'Cats', value: 'Cat', count: 18 },
-  { label: 'Other', value: 'OTHER', count: 12 },
-];
+const useMockFallback = false; // Always use API
+const PAGE_SIZE = 20;
 
 function getSpeciesEmoji(species: string) {
-  switch (species.toLowerCase()) {
+  switch (species?.toLowerCase()) {
     case 'dog': return '🐕';
     case 'cat': return '🐈';
     case 'cattle': return '🐄';
@@ -24,17 +28,57 @@ function getSpeciesEmoji(species: string) {
 export default function AnimalsPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
+  const [page, setPage] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
   const navigate = useNavigate();
-  const animals = mockAnimals;
+  const { currentOrgId } = useCurrentOrg();
+  const { toast } = useToast();
 
-  const filtered = animals.filter(a => {
-    const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.client.firstName.toLowerCase().includes(search.toLowerCase());
-    const matchesTab = activeTab === 'ALL' ||
-      (activeTab === 'OTHER' ? !['Dog', 'Cat'].includes(a.species) : a.species === activeTab);
-    return matchesSearch && matchesTab;
+  const speciesParam = activeTab === 'ALL' ? undefined : activeTab === 'OTHER' ? 'OTHER' : activeTab.toUpperCase();
+  const { data: animalsRes, isLoading, isError } = useQuery({
+    queryKey: queryKeys.animals.list(currentOrgId!, { page, search, species: activeTab }),
+    queryFn: () =>
+      api.getAnimals(currentOrgId!, {
+        page: String(page),
+        limit: String(PAGE_SIZE),
+        search: search || undefined,
+        species: speciesParam,
+      }),
+    enabled: !!currentOrgId && !useMockFallback,
   });
+
+  const animalsData = (useMockFallback || isError) ? { data: mockAnimals, meta: { totalCount: mockAnimals.length, totalPages: 1 } } : animalsRes;
+  const animals = animalsData?.data ?? [];
+  const meta = animalsData?.meta;
+  const totalPages = meta?.totalPages ?? 1;
+
+  const filtered = useMockFallback || isError
+    ? animals.filter((a) => {
+        const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
+          a.client?.firstName?.toLowerCase().includes(search.toLowerCase());
+        const matchesTab = activeTab === 'ALL' ||
+          (activeTab === 'OTHER' ? !['Dog', 'Cat'].includes(a.species) : a.species === activeTab);
+        return matchesSearch && matchesTab;
+      })
+    : animals;
+
+  const counts = {
+    all: meta?.totalCount ?? filtered.length,
+    dogs: animals.filter((a) => a.species === 'Dog').length,
+    cats: animals.filter((a) => a.species === 'Cat').length,
+    other: (meta?.totalCount ?? animals.length) - animals.filter((a) => ['Dog', 'Cat'].includes(a.species)).length,
+  };
+  const tabs = [
+    { label: 'All', value: 'ALL', count: counts.all },
+    { label: 'Dogs', value: 'Dog', count: counts.dogs },
+    { label: 'Cats', value: 'Cat', count: counts.cats },
+    { label: 'Other', value: 'OTHER', count: Math.max(0, counts.other) },
+  ];
+
+  const handleMessage = (e: React.MouseEvent, clientId: string) => {
+    e.stopPropagation();
+    toast({ title: 'Message', description: 'Messaging will be available with backend integration.' });
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -48,17 +92,17 @@ export default function AnimalsPage() {
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           placeholder="Search pets..."
           className="w-full h-11 pl-10 pr-4 rounded-xl bg-card border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary transition-colors"
         />
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
+            onClick={() => { setActiveTab(tab.value); setPage(1); }}
             className={cn(
               'px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors border',
               activeTab === tab.value
@@ -71,58 +115,120 @@ export default function AnimalsPage() {
         ))}
       </div>
 
-      <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
-        {filtered.map(animal => (
-          <div
-            key={animal.id}
-            onClick={() => navigate(`/dashboard/animals/${animal.id}`)}
-            className="bg-card border border-border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
-          >
-            <div className="flex gap-3">
-              <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center text-2xl flex-shrink-0">
-                {getSpeciesEmoji(animal.species)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-foreground">{animal.name}</h3>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/animals/${animal.id}`); }}
-                    className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    View
-                  </button>
+      {isLoading ? (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-32 bg-card border border-border rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
+          {filtered.map((animal) => (
+            <div
+              key={animal.id}
+              onClick={() => navigate(`/dashboard/animals/${animal.id}`)}
+              className="bg-card border border-border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
+            >
+              <div className="flex gap-3">
+                <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center text-2xl flex-shrink-0">
+                  {getSpeciesEmoji(animal.species)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {animal.client.firstName} {animal.client.lastName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {animal.breed ? `💛 ${animal.breed}` : animal.species}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-bold text-foreground">{animal.name}</h3>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 px-2 text-xs"
+                        onClick={(e) => { e.stopPropagation(); handleMessage(e, animal.clientId); }}
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                      </Button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/animals/${animal.id}`); }}
+                        className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {animal.client?.firstName} {animal.client?.lastName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {animal.breed ? `💛 ${animal.breed}` : animal.species}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="w-2 h-2 rounded-full bg-primary" />
+                  <span>Vaccination as due</span>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/clients/${animal.clientId}`); }}
+                  className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <PawPrint className="w-3 h-3" /> Client <ChevronRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                <span>Vaccination as due</span>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); navigate('/dashboard/clients'); }}
-                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                <PawPrint className="w-3 h-3" /> Client <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !isLoading && (
         <div className="text-center py-16 text-muted-foreground">
           <PawPrint className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>No animals found</p>
         </div>
       )}
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious onClick={() => setPage((p) => Math.max(1, p - 1))} />
+            </PaginationItem>
+            {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  onClick={() => setPage(i + 1)}
+                  isActive={page === i + 1}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext onClick={() => setPage((p) => Math.min(totalPages, p + 1))} />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+
+      {/* Don't Forget */}
+      <div className="bg-accent border border-border rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertCircle className="w-5 h-5 text-warning" />
+          <h3 className="font-bold text-foreground">Don't Forget</h3>
+        </div>
+        <ul className="space-y-1 text-sm text-foreground">
+          <li className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Pets due for vaccination
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Follow-ups today
+          </li>
+        </ul>
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => navigate('/dashboard/schedule')}>
+          View All
+        </Button>
+      </div>
 
       <div className="lg:hidden pb-4">
         <button

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { mockTreatments } from '@/lib/mock-data';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -8,6 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+
+const useMockFallback = false; // Always use API
 
 const sortOptions = [
   { label: 'Date (Newest)', value: 'date-desc' },
@@ -21,8 +27,17 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date-desc');
   const { toast } = useToast();
+  const { currentOrgId } = useCurrentOrg();
 
-  const filtered = mockTreatments
+  const { data: treatmentsRes, isLoading, isError } = useQuery({
+    queryKey: queryKeys.treatments.list(currentOrgId!, { payments: 'all' }),
+    queryFn: () => api.getTreatments(currentOrgId!, { limit: '500' }),
+    enabled: !!currentOrgId && !useMockFallback,
+  });
+
+  const allTreatments = useMockFallback || isError ? mockTreatments : treatmentsRes?.data ?? [];
+
+  const filtered = allTreatments
     .filter(t => {
       const matchesStatus = statusFilter === 'ALL' || t.paymentStatus === statusFilter;
       const matchesSearch = search === '' ||
@@ -217,7 +232,11 @@ export default function PaymentsPage() {
         </Table>
       </div>
 
-      {filtered.length === 0 && (
+      {(isLoading && !useMockFallback) && (
+        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+      )}
+
+      {filtered.length === 0 && !isLoading && (
         <div className="text-center py-16 text-muted-foreground">
           <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>No transactions found</p>

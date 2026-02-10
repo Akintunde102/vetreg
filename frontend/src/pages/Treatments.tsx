@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Search, ClipboardList, Calendar, Plus } from 'lucide-react';
 import { mockTreatments } from '@/lib/mock-data';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+
+const useMockFallback = false; // Always use API
 
 const statusTabs = [
   { label: 'All', value: 'ALL' },
@@ -25,7 +31,19 @@ export default function TreatmentsPage() {
   const [search, setSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('ALL');
   const navigate = useNavigate();
-  const treatments = mockTreatments;
+  const { currentOrgId } = useCurrentOrg();
+
+  const { data: treatmentsRes, isLoading, isError } = useQuery({
+    queryKey: queryKeys.treatments.list(currentOrgId!, { search, status: activeStatus }),
+    queryFn: () =>
+      api.getTreatments(currentOrgId!, {
+        search: search || undefined,
+        status: activeStatus === 'ALL' ? undefined : activeStatus,
+      }),
+    enabled: !!currentOrgId && !useMockFallback,
+  });
+
+  const treatments = useMockFallback || isError ? mockTreatments : treatmentsRes?.data ?? [];
 
   const filtered = treatments.filter(t => {
     const matchesStatus = activeStatus === 'ALL' || t.status === activeStatus;
@@ -74,6 +92,13 @@ export default function TreatmentsPage() {
       </div>
 
       {/* Cards */}
+      {isLoading && !useMockFallback ? (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-32 bg-card border border-border rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : (
       <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
         {filtered.map(t => (
           <div
@@ -118,8 +143,9 @@ export default function TreatmentsPage() {
           </div>
         ))}
       </div>
+      )}
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !isLoading && (
         <div className="text-center py-16 text-muted-foreground">
           <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>No treatments found</p>

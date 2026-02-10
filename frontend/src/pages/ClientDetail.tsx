@@ -1,8 +1,16 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Phone, Mail, PawPrint, Calendar, DollarSign, Clock } from 'lucide-react';
 import { mockClients, mockClientDetails, mockAnimals, mockTreatments } from '@/lib/mock-data';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import type { Client } from '@/types/api';
+import type { Animal as AnimalType, Treatment } from '@/types/api';
+
+const useMockFallback = false; // Always use API
 
 function getSpeciesEmoji(species: string) {
   switch (species.toLowerCase()) {
@@ -16,13 +24,39 @@ function getSpeciesEmoji(species: string) {
 export default function ClientDetailPage() {
   const { clientId } = useParams();
   const navigate = useNavigate();
+  const { currentOrgId } = useCurrentOrg();
 
-  const client = mockClients.find(c => c.id === clientId);
-  const details = mockClientDetails.find(d => d.clientId === clientId);
-  const animals = mockAnimals.filter(a => a.clientId === clientId);
-  const treatments = mockTreatments.filter(t => animals.some(a => a.id === t.animalId));
+  const { data: clientData, isLoading, isError } = useQuery({
+    queryKey: queryKeys.clients.detail(currentOrgId!, clientId!),
+    queryFn: () => api.getClient(currentOrgId!, clientId!),
+    enabled: !!currentOrgId && !!clientId && !useMockFallback,
+  });
+  const { data: clientAnimals = [] } = useQuery({
+    queryKey: ['clients', currentOrgId, clientId, 'animals'],
+    queryFn: () => api.getClientAnimals(currentOrgId!, clientId!),
+    enabled: !!currentOrgId && !!clientId && !useMockFallback,
+  });
+  const { data: orgTreatmentsRes } = useQuery({
+    queryKey: queryKeys.treatments.list(currentOrgId!, { clientDetail: clientId }),
+    queryFn: () => api.getTreatments(currentOrgId!, { limit: '200' }),
+    enabled: !!currentOrgId && !!clientId && !useMockFallback && (clientAnimals?.length ?? 0) > 0,
+  });
 
-  if (!client) {
+  const client: Client | undefined = useMockFallback || isError
+    ? mockClients.find((c) => c.id === clientId)
+    : clientData;
+  const details = mockClientDetails.find((d) => d.clientId === clientId);
+  const animals: AnimalType[] = useMockFallback || isError
+    ? mockAnimals.filter((a) => a.clientId === clientId)
+    : (clientAnimals ?? []);
+  const allTreatments = useMockFallback || isError
+    ? mockTreatments
+    : orgTreatmentsRes?.data ?? [];
+  const treatments: Treatment[] = useMockFallback || isError
+    ? mockTreatments.filter((t) => animals.some((a) => a.id === t.animalId))
+    : allTreatments.filter((t) => animals.some((a) => a.id === t.animalId));
+
+  if (!client && !isLoading) {
     return (
       <div className="text-center py-20 text-muted-foreground animate-fade-in">
         <PawPrint className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -34,7 +68,16 @@ export default function ClientDetailPage() {
     );
   }
 
-  const initials = `${client.firstName[0]}${client.lastName[0]}`;
+  if (isLoading && !useMockFallback) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <div className="h-8 w-24 bg-muted rounded animate-pulse" />
+        <div className="h-40 bg-card border border-border rounded-xl animate-pulse" />
+      </div>
+    );
+  }
+
+  const initials = `${client!.firstName[0]}${client!.lastName[0]}`;
   const balance = details?.balance ?? 0;
   const totalPaid = treatments.filter(t => t.paymentStatus === 'PAID').reduce((s, t) => s + (t.amount || 0), 0);
   const totalOwed = treatments.filter(t => t.paymentStatus === 'OWED').reduce((s, t) => s + (t.amount || 0), 0);

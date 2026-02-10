@@ -1,24 +1,44 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useOrgStore } from '@/lib/stores/org-store';
+import { useAuth } from '@/hooks/useAuth';
 
-interface OrgContextType {
-  currentOrgId: string | null;
-  setCurrentOrgId: (id: string) => void;
+function useOrgs(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.orgs.all,
+    queryFn: () => api.getOrganizations(),
+    staleTime: 5 * 60 * 1000,
+    enabled,
+  });
 }
 
-const OrgContext = createContext<OrgContextType | null>(null);
-
 export function OrgProvider({ children }: { children: ReactNode }) {
-  const [currentOrgId, setCurrentOrgId] = useState<string | null>('org1');
+  const { isAuthenticated } = useAuth();
+  const { data: orgs } = useOrgs(!!isAuthenticated);
+  const { currentOrgId, setCurrentOrgId } = useOrgStore();
 
-  return (
-    <OrgContext.Provider value={{ currentOrgId, setCurrentOrgId }}>
-      {children}
-    </OrgContext.Provider>
-  );
+  useEffect(() => {
+    if (!orgs?.length || currentOrgId) return;
+    const firstApproved = orgs.find((o) => o.status === 'APPROVED');
+    if (firstApproved) setCurrentOrgId(firstApproved.id);
+  }, [orgs, currentOrgId, setCurrentOrgId]);
+
+  return <>{children}</>;
 }
 
 export function useCurrentOrg() {
-  const ctx = useContext(OrgContext);
-  if (!ctx) throw new Error('useCurrentOrg must be used within OrgProvider');
-  return ctx;
+  const { isAuthenticated } = useAuth();
+  const { currentOrgId, setCurrentOrgId } = useOrgStore();
+  const { data: orgs } = useOrgs(!!isAuthenticated);
+
+  const currentOrg = orgs?.find((o) => o.id === currentOrgId) ?? orgs?.[0];
+
+  return {
+    currentOrgId: currentOrgId ?? currentOrg?.id ?? null,
+    currentOrg,
+    orgs: orgs ?? [],
+    setCurrentOrgId,
+  };
 }

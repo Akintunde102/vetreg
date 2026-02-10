@@ -1,23 +1,25 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Calendar, Search, AlertCircle, ArrowRight, Filter, ArrowUpDown, Plus } from 'lucide-react';
+import { format, parseISO, subDays } from 'date-fns';
 import { mockRevenue, mockTreatments } from '@/lib/mock-data';
-import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AddNewDialog } from '@/components/AddNewDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 
-const statusTabs = [
-  { label: 'Revenue', value: 'ALL', highlight: true },
-  { label: 'Pending', value: 'OWED', count: 8 },
-  { label: 'Paid', value: 'PAID', count: 14 },
-];
+const useMockFallback = false; // Always use API
 
 const categoryTabs = [
   { label: 'All Payments', value: 'ALL' },
-  { label: 'Clinic Payments', value: 'PET' },
-  { label: 'Farm Payments', value: 'LIVESTOCK' },
+  { label: 'Pet Payment', value: 'PET' },
+  { label: 'Livestock Payment', value: 'LIVESTOCK' },
+  { label: 'Farm Payments', value: 'FARM' },
 ];
 
 const sortOptions = [
@@ -33,19 +35,69 @@ export default function RevenuePage() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('date-desc');
   const [addOpen, setAddOpen] = useState(false);
+  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
   const navigate = useNavigate();
   const { toast } = useToast();
-  const revenue = mockRevenue;
-  const treatments = mockTreatments;
+  const { currentOrgId } = useCurrentOrg();
+  const queryClient = useQueryClient();
 
-  const filtered = treatments
-    .filter(t => {
-      const matchesStatus = activeStatus === 'ALL' || t.paymentStatus === activeStatus;
-      const matchesCategory = activeCategory === 'ALL' || t.paymentCategory === activeCategory;
-      const matchesSearch = search === '' ||
-        t.animal.name.toLowerCase().includes(search.toLowerCase()) ||
-        t.organization.name.toLowerCase().includes(search.toLowerCase());
-      return matchesStatus && matchesCategory && matchesSearch;
+  const { data: revenueData, isError: revenueError } = useQuery({
+    queryKey: queryKeys.orgs.revenue(currentOrgId!, {
+      fromDate: dateRange.from.toISOString().split('T')[0],
+      toDate: dateRange.to.toISOString().split('T')[0],
+    }),
+    queryFn: () =>
+      api.getRevenue(currentOrgId!, {
+        fromDate: dateRange.from.toISOString().split('T')[0],
+        toDate: dateRange.to.toISOString().split('T')[0],
+      }),
+    enabled: !!currentOrgId && !useMockFallback,
+  });
+
+  const { data: followUpsData } = useQuery({
+    queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
+    queryFn: () => api.getFollowUpsToday(currentOrgId!),
+    enabled: !!currentOrgId && !useMockFallback,
+  });
+  const followUpsCount = (followUpsData as { count?: number })?.count ?? 0;
+
+  const { data: treatmentsRes } = useQuery({
+    queryKey: ['treatments', currentOrgId, activeStatus, activeCategory],
+    queryFn: () =>
+      api.getTreatments(currentOrgId!, {
+        paymentStatus: activeStatus === 'ALL' ? undefined : activeStatus,
+        paymentCategory: activeCategory === 'ALL' ? undefined : activeCategory,
+        limit: '100',
+      }),
+    enabled: !!currentOrgId && !useMockFallback,
+  });
+
+  const mapRevenue = (data: unknown) => {
+    if (!data || typeof data !== 'object') return mockRevenue;
+    const d = data as Record<string, unknown>;
+    const pb = d.paymentBreakdown as Array<{ status: string; count: number }> | undefined;
+    const paid = pb?.find((x) => x.status === 'PAID');
+    const owed = pb?.find((x) => x.status === 'OWED');
+    return {
+      totalRevenue: Number(d.totalRevenue) || mockRevenue.totalRevenue,
+      paymentBreakdown: {
+        PAID: { count: paid?.count ?? 0, total: 0 },
+        OWED: { count: owed?.count ?? 0, total: 0 },
+      },
+    };
+  };
+  const revenue = (useMockFallback || revenueError) ? mockRevenue : mapRevenue(revenueData);
+  const treatmentsRaw = (useMockFallback || !treatmentsRes) ? mockTreatments : treatmentsRes?.data ?? [];
+  const paidCount = revenue.paymentBreakdown?.PAID?.count ?? 0;
+  const owedCount = revenue.paymentBreakdown?.OWED?.count ?? 0;
+
+  const filtered = treatmentsRaw
+    .filter((t) => {
+      const matchesSearch =
+        search === '' ||
+        t.animal?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        t.organization?.name?.toLowerCase().includes(search.toLowerCase());
+      return matchesSearch;
     })
     .sort((a, b) => {
       if (sortBy === 'date-desc') return new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime();
@@ -54,6 +106,25 @@ export default function RevenuePage() {
       return (a.amount || 0) - (b.amount || 0);
     });
 
+  const markPaymentMutation = useMutation({
+    mutationFn: ({
+      treatmentId,
+      amount,
+      paymentNotes,
+    }: { treatmentId: string; amount: number; paymentNotes?: string }) =>
+      api.markPayment(currentOrgId!, treatmentId, {
+        paymentStatus: 'PAID',
+        amountPaid: amount,
+        paymentNotes: paymentNotes ?? 'Cash',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['treatments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['orgs', currentOrgId!, 'revenue'] });
+      toast({ title: 'Payment recorded' });
+    },
+  });
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div>
@@ -61,13 +132,70 @@ export default function RevenuePage() {
         <p className="text-sm text-muted-foreground mt-0.5">Manage all payments and invoices.</p>
       </div>
 
-      <div className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-2.5">
-        <Calendar className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm text-foreground">Apr 1, 2024 – Apr 25, 2024</span>
-      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-2.5 w-full sm:w-auto">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-foreground">
+              {format(dateRange.from, 'MMM d, yyyy')} – {format(dateRange.to, 'MMM d, yyyy')}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent>
+          <div className="p-2 space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}
+            >
+              Last 7 days
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}
+            >
+              Last 30 days
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() =>
+                setDateRange({
+                  from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                  to: new Date(),
+                })
+              }
+            >
+              This month
+            </Button>
+            <div className="flex gap-2 pt-2">
+              <input
+                type="date"
+                value={format(dateRange.from, 'yyyy-MM-dd')}
+                onChange={(e) => setDateRange((r) => ({ ...r, from: new Date(e.target.value) }))}
+                className="flex-1 px-2 py-1 text-sm border rounded"
+              />
+              <input
+                type="date"
+                value={format(dateRange.to, 'yyyy-MM-dd')}
+                onChange={(e) => setDateRange((r) => ({ ...r, to: new Date(e.target.value) }))}
+                className="flex-1 px-2 py-1 text-sm border rounded"
+              />
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {statusTabs.map(tab => (
+        {[
+          { label: 'Revenue', value: 'ALL', highlight: true },
+          { label: 'Pending', value: 'OWED', count: owedCount },
+          { label: 'Paid', value: 'PAID', count: paidCount },
+        ].map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveStatus(tab.value)}
@@ -79,9 +207,8 @@ export default function RevenuePage() {
             )}
           >
             {tab.highlight
-              ? `Revenue ₦${(revenue.totalRevenue / 1000).toLocaleString()}k`
-              : `${tab.label} (${tab.count})`
-            }
+              ? `Revenue ₦${(Number(revenue.totalRevenue) / 1000).toLocaleString()}k`
+              : `${tab.label} (${tab.count})`}
           </button>
         ))}
       </div>
@@ -100,35 +227,19 @@ export default function RevenuePage() {
         <Popover>
           <PopoverTrigger asChild>
             <button className="p-2.5 bg-card border border-border rounded-xl hover:bg-muted transition-colors">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-2" align="end">
-            <p className="text-xs font-semibold text-muted-foreground uppercase px-2 pb-1">Filter by status</p>
-            {['ALL', 'PAID', 'OWED'].map(s => (
-              <button
-                key={s}
-                onClick={() => setActiveStatus(s)}
-                className={cn('w-full text-left px-3 py-2 text-sm rounded-lg transition-colors', activeStatus === s ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted text-foreground')}
-              >
-                {s === 'ALL' ? 'All' : s === 'PAID' ? 'Paid' : 'Pending'}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="p-2.5 bg-card border border-border rounded-xl hover:bg-muted transition-colors">
               <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-48 p-2" align="end">
             <p className="text-xs font-semibold text-muted-foreground uppercase px-2 pb-1">Sort by</p>
-            {sortOptions.map(opt => (
+            {sortOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setSortBy(opt.value)}
-                className={cn('w-full text-left px-3 py-2 text-sm rounded-lg transition-colors', sortBy === opt.value ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted text-foreground')}
+                className={cn(
+                  'w-full text-left px-3 py-2 text-sm rounded-lg transition-colors',
+                  sortBy === opt.value ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted text-foreground'
+                )}
               >
                 {opt.label}
               </button>
@@ -138,7 +249,7 @@ export default function RevenuePage() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {categoryTabs.map(tab => (
+        {categoryTabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveCategory(tab.value)}
@@ -155,28 +266,35 @@ export default function RevenuePage() {
       </div>
 
       <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
-        {filtered.map(t => (
+        {filtered.map((t) => (
           <div key={t.id} className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-all">
             <div className="flex gap-3">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-lg flex-shrink-0">
-                {t.animal.species === 'Dog' ? '🐕' : t.animal.species === 'Cat' ? '🐈' : '🐄'}
+                {t.animal?.species === 'Dog' ? '🐕' : t.animal?.species === 'Cat' ? '🐈' : '🐄'}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-bold text-foreground">
-                      {t.animal.patientType === 'BATCH_LIVESTOCK' ? `Batch ${t.animal.batchIdentifier}` : t.animal.name}
+                      {t.animal?.patientType === 'BATCH_LIVESTOCK' ? `Batch ${t.animal?.batchIdentifier}` : t.animal?.name}
                     </h3>
-                    <p className="text-xs text-muted-foreground">{t.organization.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.organization?.name}</p>
                     <p className="text-xs text-muted-foreground">{t.diagnosis}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-foreground">₦{(t.amount || 0).toLocaleString()}</p>
-                    <span className={cn(
-                      'inline-flex items-center gap-1 text-[11px] font-medium',
-                      t.paymentStatus === 'PAID' ? 'text-primary' : 'text-destructive'
-                    )}>
-                      <span className={cn('w-1.5 h-1.5 rounded-full', t.paymentStatus === 'PAID' ? 'bg-primary' : 'bg-destructive')} />
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 text-[11px] font-medium',
+                        t.paymentStatus === 'PAID' ? 'text-primary' : 'text-destructive'
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'w-1.5 h-1.5 rounded-full',
+                          t.paymentStatus === 'PAID' ? 'bg-primary' : 'bg-destructive'
+                        )}
+                      />
                       {t.paymentStatus === 'PAID' ? 'Paid' : 'Pending'}
                     </span>
                   </div>
@@ -191,10 +309,16 @@ export default function RevenuePage() {
               </div>
               {t.paymentStatus === 'OWED' && (
                 <button
-                  onClick={() => toast({ title: 'Reminder sent', description: `Payment reminder sent for ₦${(t.amount || 0).toLocaleString()}.` })}
-                  className="text-xs font-medium text-warning border border-warning/30 px-3 py-1 rounded-lg hover:bg-warning/5 transition-colors"
+                  onClick={() =>
+                    markPaymentMutation.mutate({
+                      treatmentId: t.id,
+                      amount: t.amount || 0,
+                      paymentNotes: 'Cash',
+                    })
+                  }
+                  className="text-xs font-medium text-primary border border-primary/30 px-3 py-1 rounded-lg hover:bg-primary/5"
                 >
-                  💛 Send Reminder
+                  Mark Paid
                 </button>
               )}
             </div>
@@ -215,18 +339,21 @@ export default function RevenuePage() {
             <AlertCircle className="w-5 h-5 text-warning" />
             <h3 className="font-bold text-foreground">Don't Forget</h3>
           </div>
-          <button onClick={() => navigate('/dashboard/payments')} className="text-sm text-primary font-medium hover:underline flex items-center gap-1">
+          <button
+            onClick={() => navigate('/dashboard/payments')}
+            className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+          >
             View All <ArrowRight className="w-3 h-3" />
           </button>
         </div>
         <ul className="space-y-1">
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>2</strong> unpaid invoices
+            <strong>{owedCount}</strong> unpaid invoices
           </li>
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>3</strong> follow-ups today
+            <strong>{followUpsCount}</strong> follow-ups today
           </li>
         </ul>
       </div>

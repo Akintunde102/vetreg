@@ -1,13 +1,34 @@
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
+
+const hasSupabase = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+
+const errorMessages: Record<string, string> = {
+  auth_failed: 'Sign-in was cancelled or the session could not be established. Please try again.',
+  something_went_wrong: 'Google sign-in succeeded but we could not complete setup. See below for details.',
+};
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, isAuthenticated, isApproved } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const error = searchParams.get('error');
+  const message = searchParams.get('message');
 
-  const handleSignIn = () => {
-    signIn();
-    navigate('/dashboard');
+  useEffect(() => {
+    if (!hasSupabase && isAuthenticated && isApproved) {
+      const redirect = searchParams.get('redirect') || '/dashboard';
+      navigate(redirect, { replace: true });
+    }
+  }, [hasSupabase, isAuthenticated, isApproved, navigate, searchParams]);
+
+  const handleSignIn = async () => {
+    await signIn();
+    if (!hasSupabase) {
+      const redirect = searchParams.get('redirect') || '/dashboard';
+      navigate(redirect, { replace: true });
+    }
   };
 
   return (
@@ -21,6 +42,24 @@ export default function LoginPage() {
 
           <h1 className="text-2xl font-bold text-foreground mb-2">Welcome to VetReg</h1>
           <p className="text-muted-foreground mb-8">Manage your veterinary practice efficiently</p>
+
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-left">
+              <p className="text-sm font-medium text-destructive">
+                {errorMessages[error] ?? 'Something went wrong.'}
+              </p>
+              {message && (
+                <p className="text-xs text-muted-foreground mt-2 break-all">{message}</p>
+              )}
+              {error === 'something_went_wrong' && (
+                <ul className="text-xs text-muted-foreground mt-3 list-disc list-inside space-y-1">
+                  <li>Ensure the backend is running (e.g. <code className="bg-muted px-1 rounded">npm run start:dev</code> in backend).</li>
+                  <li>In <code className="bg-muted px-1 rounded">backend/.env</code>, set <code className="bg-muted px-1 rounded">FRONTEND_URL</code> to your app origin (e.g. <code className="bg-muted px-1 rounded">http://localhost:8080</code>).</li>
+                  <li>Confirm <code className="bg-muted px-1 rounded">SUPABASE_JWT_SECRET</code> in backend matches the JWT secret in Supabase (Project → Settings → API).</li>
+                </ul>
+              )}
+            </div>
+          )}
 
           <button
             onClick={handleSignIn}

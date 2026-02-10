@@ -1,41 +1,82 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Search, ChevronDown, PawPrint, AlertCircle, ArrowRight, Plus } from 'lucide-react';
 import { mockClients, mockClientDetails } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AddNewDialog } from '@/components/AddNewDialog';
+import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
+import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import type { Client } from '@/types/api';
 
-const tabs = [
-  { label: 'All', value: 'ALL', count: 86 },
-  { label: 'Pets', value: 'PETS', count: 62 },
-  { label: 'Livestock', value: 'LIVESTOCK', count: 24 },
-  { label: 'Has Balance', value: 'BALANCE', count: 5 },
-];
+const useMockFallback = false; // Always use API
+
+type ClientWithDetails = Client & { petCount?: number; livestockCount?: number; balance?: number; lastVisit?: string };
+
+function getTabs(clients: ClientWithDetails[]) {
+  const all = clients.length;
+  const pets = clients.filter((c) => (c.petCount ?? c._count?.animals ?? 0) > 0).length;
+  const livestock = clients.filter((c) => (c.livestockCount ?? 0) > 0).length;
+  const balance = clients.filter((c) => (c.balance ?? 0) > 0).length;
+  return [
+    { label: 'All', value: 'ALL', count: all },
+    { label: 'Pets', value: 'PETS', count: pets },
+    { label: 'Livestock', value: 'LIVESTOCK', count: livestock },
+    { label: 'Has Balance', value: 'BALANCE', count: balance },
+  ];
+}
 
 export default function ClientsPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
   const [addOpen, setAddOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currentOrgId } = useCurrentOrg();
 
-  const clients = mockClients.map(c => {
-    const details = mockClientDetails.find(d => d.clientId === c.id);
-    return { ...c, ...details };
+  const { data: clientsRes, isLoading, isError } = useQuery({
+    queryKey: queryKeys.clients.list(currentOrgId!, { page: String(page), search }),
+    queryFn: () =>
+      api.getClients(currentOrgId!, {
+        page: String(page),
+        limit: '50',
+        search: search || undefined,
+      }),
+    enabled: !!currentOrgId && !useMockFallback,
   });
 
-  const filtered = clients.filter(c => {
-    const matchesSearch = !search ||
+  const clientsRaw = useMockFallback || isError
+    ? mockClients.map((c) => {
+        const details = mockClientDetails.find((d) => d.clientId === c.id);
+        return { ...c, ...details } as ClientWithDetails;
+      })
+    : (clientsRes?.data ?? []);
+  const clients: ClientWithDetails[] = useMockFallback || isError
+    ? clientsRaw
+    : clientsRaw.map((c) => ({
+        ...c,
+        petCount: c._count?.animals,
+        lastVisit: '—',
+        balance: 0,
+        livestockCount: 0,
+      }));
+
+  const filtered = clients.filter((c) => {
+    const matchesSearch =
+      !search ||
       `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
       c.email?.toLowerCase().includes(search.toLowerCase());
-
     if (activeTab === 'ALL') return matchesSearch;
-    if (activeTab === 'PETS') return matchesSearch && (c.petCount ?? 0) > 0;
+    if (activeTab === 'PETS') return matchesSearch && (c.petCount ?? c._count?.animals ?? 0) > 0;
     if (activeTab === 'LIVESTOCK') return matchesSearch && (c.livestockCount ?? 0) > 0;
     if (activeTab === 'BALANCE') return matchesSearch && (c.balance ?? 0) > 0;
     return matchesSearch;
   });
+
+  const tabs = getTabs(clients);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -56,7 +97,7 @@ export default function ClientsPage() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
@@ -72,65 +113,84 @@ export default function ClientsPage() {
         ))}
       </div>
 
-      <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
-        {filtered.map(client => {
-          const hasBalance = (client.balance ?? 0) > 0;
-          const petText: string[] = [];
-          if (client.petCount && client.petCount > 0) petText.push(`${client.petCount} pet${client.petCount > 1 ? 's' : ''}`);
-          if (client.livestockCount && client.livestockCount > 0) petText.push(`${client.livestockCount} goats`);
+      {isLoading && !useMockFallback ? (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-32 bg-card border border-border rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
+          {filtered.map((client) => {
+            const hasBalance = (client.balance ?? 0) > 0;
+            const petText: string[] = [];
+            if ((client.petCount ?? client._count?.animals ?? 0) > 0)
+              petText.push(`${client.petCount ?? client._count?.animals ?? 0} pet${(client.petCount ?? client._count?.animals ?? 0) > 1 ? 's' : ''}`);
+            if ((client.livestockCount ?? 0) > 0) petText.push(`${client.livestockCount} goats`);
 
-          return (
-            <div key={client.id} onClick={() => navigate(`/dashboard/clients/${client.id}`)} className="bg-card border border-border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer">
-              <div className="flex gap-3">
-                <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-lg flex-shrink-0 font-bold text-primary">
-                  {client.firstName[0]}{client.lastName[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-bold text-foreground">{client.firstName} {client.lastName}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {client.phoneNumber} | {client.email}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{petText.join(', ')}</p>
+            return (
+              <div
+                key={client.id}
+                onClick={() => navigate(`/dashboard/clients/${client.id}`)}
+                className="bg-card border border-border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
+              >
+                <div className="flex gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-lg flex-shrink-0 font-bold text-primary">
+                    {client.firstName[0]}
+                    {client.lastName[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-bold text-foreground">
+                          {client.firstName} {client.lastName}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {client.phoneNumber} | {client.email ?? '—'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{petText.join(', ') || '—'}</p>
+                      </div>
+                      {hasBalance ? (
+                        <span className="text-xs font-bold text-warning bg-warning/10 border border-warning/20 px-2.5 py-1 rounded-lg">
+                          ₦{(client.balance ?? 0).toLocaleString()} Due
+                        </span>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toast({ title: 'Message sent', description: `SMS sent to ${client.firstName} ${client.lastName}.` });
+                          }}
+                          className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                        >
+                          Message
+                        </button>
+                      )}
                     </div>
-                    {hasBalance ? (
-                      <span className="text-xs font-bold text-warning bg-warning/10 border border-warning/20 px-2.5 py-1 rounded-lg">
-                        ₦{(client.balance ?? 0).toLocaleString()} Due
-                      </span>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toast({ title: 'Message sent', description: `SMS sent to ${client.firstName} ${client.lastName}.` });
-                        }}
-                        className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
-                      >
-                        Message
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className={cn('w-2 h-2 rounded-full', hasBalance ? 'bg-warning' : 'bg-primary')} />
-                  <span>{client.lastVisit}</span>
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn('w-2 h-2 rounded-full', hasBalance ? 'bg-warning' : 'bg-primary')} />
+                    <span>{client.lastVisit ?? '—'}</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/dashboard/animals');
+                    }}
+                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <PawPrint className="w-3 h-3" /> Pets <ChevronDown className="w-3 h-3" />
+                  </button>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate('/dashboard/animals'); }}
-                  className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                >
-                  <PawPrint className="w-3 h-3" /> Pets <ChevronDown className="w-3 h-3" />
-                </button>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !isLoading && (
         <div className="text-center py-16 text-muted-foreground">
           <PawPrint className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>No clients found</p>
@@ -143,7 +203,10 @@ export default function ClientsPage() {
             <AlertCircle className="w-5 h-5 text-warning" />
             <h3 className="font-bold text-foreground">Don't Forget</h3>
           </div>
-          <button onClick={() => navigate('/dashboard/schedule')} className="text-sm text-primary font-medium hover:underline flex items-center gap-1">
+          <button
+            onClick={() => navigate('/dashboard/schedule')}
+            className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+          >
             View All <ArrowRight className="w-3 h-3" />
           </button>
         </div>

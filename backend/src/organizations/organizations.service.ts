@@ -110,8 +110,52 @@ export class OrganizationsService {
       },
     });
 
+    const orgIds = memberships.map((m) => m.organization.id);
+
+    const [clientCounts, animalCounts, memberCounts] = await Promise.all([
+      this.prisma.client.groupBy({
+        by: ['organizationId'],
+        where: {
+          organizationId: { in: orgIds },
+          isDeleted: false,
+        },
+        _count: { id: true },
+      }),
+      this.prisma.animal.groupBy({
+        by: ['organizationId'],
+        where: {
+          organizationId: { in: orgIds },
+          isDeleted: false,
+        },
+        _count: { id: true },
+      }),
+      this.prisma.orgMembership.groupBy({
+        by: ['organizationId'],
+        where: {
+          organizationId: { in: orgIds },
+          status: MembershipStatus.ACTIVE,
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    const clientsByOrg = Object.fromEntries(
+      clientCounts.map((c) => [c.organizationId, c._count.id]),
+    );
+    const animalsByOrg = Object.fromEntries(
+      animalCounts.map((a) => [a.organizationId, a._count.id]),
+    );
+    const membersByOrg = Object.fromEntries(
+      memberCounts.map((m) => [m.organizationId, m._count.id]),
+    );
+
     return memberships.map((m) => ({
       ...m.organization,
+      _counts: {
+        clients: clientsByOrg[m.organization.id] ?? 0,
+        animals: animalsByOrg[m.organization.id] ?? 0,
+        members: membersByOrg[m.organization.id] ?? 0,
+      },
       membership: {
         role: m.role,
         joinedAt: m.joinedAt,

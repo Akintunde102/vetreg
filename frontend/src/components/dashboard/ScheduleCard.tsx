@@ -4,9 +4,10 @@ import { Clock, PawPrint } from 'lucide-react';
 
 interface ScheduleCardProps {
   treatment: Treatment;
+  onSettle?: () => void;
 }
 
-export function ScheduleCard({ treatment }: ScheduleCardProps) {
+export function ScheduleCard({ treatment, onSettle }: ScheduleCardProps) {
   const time = treatment.scheduledFor ? format(parseISO(treatment.scheduledFor), 'h:mm a') : '';
 
   return (
@@ -26,7 +27,10 @@ export function ScheduleCard({ treatment }: ScheduleCardProps) {
         </div>
       </div>
 
-      <button className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:opacity-90">
+      <button
+        onClick={(e) => { e.stopPropagation(); onSettle?.(); }}
+        className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:opacity-90"
+      >
         Settle
       </button>
     </div>

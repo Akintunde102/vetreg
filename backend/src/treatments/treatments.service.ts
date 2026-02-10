@@ -578,6 +578,8 @@ export class TreatmentsService {
     organizationId: string,
     page: number = 1,
     limit: number = 50,
+    fromDate?: string,
+    toDate?: string,
   ) {
     const skip = (page - 1) * limit;
 
@@ -587,6 +589,20 @@ export class TreatmentsService {
       isScheduled: true,
       isLatestVersion: true,
     };
+
+    if (fromDate || toDate) {
+      where.scheduledFor = {};
+      if (fromDate) {
+        const from = new Date(fromDate);
+        from.setHours(0, 0, 0, 0);
+        where.scheduledFor.gte = from;
+      }
+      if (toDate) {
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        where.scheduledFor.lte = to;
+      }
+    }
 
     const [treatments, total] = await Promise.all([
       this.prisma.treatmentRecord.findMany({
