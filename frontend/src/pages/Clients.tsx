@@ -40,6 +40,15 @@ export default function ClientsPage() {
     queryFn: () => api.getDashboardStats(currentOrgId!),
     enabled: !!currentOrgId,
   });
+  const { data: followUpsData } = useQuery({
+    queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
+    queryFn: () => api.getFollowUpsToday(currentOrgId!),
+    enabled: !!currentOrgId,
+  });
+  const followUpsCount =
+    (followUpsData as { treatments?: unknown[] })?.treatments?.length ??
+    (followUpsData as { count?: number })?.count ??
+    0;
   const { data: clientsRes, isLoading, isError } = useQuery({
     queryKey: queryKeys.clients.list(currentOrgId!, { page: String(page), search }),
     queryFn: () =>
@@ -220,7 +229,7 @@ export default function ClientsPage() {
         <ul className="space-y-1">
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>{dashboardStats?.treatments?.followUpsDue ?? 0}</strong> follow-ups today
+            <strong>{followUpsCount}</strong> follow-ups today
           </li>
           <li className="flex items-center gap-2 text-sm text-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />

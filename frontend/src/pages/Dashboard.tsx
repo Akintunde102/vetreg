@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
-  Building2, Users, PawPrint, Tractor, DollarSign,
+  Users, PawPrint, Tractor, DollarSign,
   ClipboardList, CalendarDays, ArrowRight, AlertCircle, Plus,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -25,7 +25,7 @@ function getGreeting() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { currentOrgId, orgs } = useCurrentOrg();
+  const { currentOrgId, currentOrg, orgs } = useCurrentOrg();
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -67,7 +67,6 @@ export default function DashboardPage() {
   });
 
   const displayStats = stats;
-  const displayOrgs = orgs ?? [];
   const scheduledList = scheduledData?.treatments ?? [];
   const followUpsList = followUpsData?.treatments ?? [];
   const scheduledIds = new Set(scheduledList.map((t) => t.id));
@@ -79,17 +78,16 @@ export default function DashboardPage() {
   const isLoading = !!currentOrgId && statsLoading;
 
   const lastName = user?.fullName?.split(' ').pop() || '';
-  const pendingOrgsCount = displayOrgs.filter((o) => o.status === 'PENDING_APPROVAL').length;
 
   if (!currentOrgId && orgs?.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-muted-foreground mb-4">No organizations yet. Create one to get started.</p>
+        <p className="text-muted-foreground mb-4">Select a clinic or create one on the Clinics page to see your dashboard.</p>
         <button
           onClick={() => navigate('/organizations')}
           className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium"
         >
-          Add Vet Clinic
+          Go to Clinics
         </button>
       </div>
     );
@@ -97,8 +95,17 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Greeting */}
+      {/* Clinic context + Greeting */}
       <div className="relative">
+        {currentOrg && (
+          <div className="mb-3 p-3 rounded-xl bg-muted/50 border border-border">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">This dashboard</p>
+            <p className="font-semibold text-foreground">{currentOrg.name}</p>
+            {currentOrg.welcomeMessage && (
+              <p className="text-sm text-muted-foreground mt-1">{currentOrg.welcomeMessage}</p>
+            )}
+          </div>
+        )}
         <p className="text-primary font-semibold text-base">{getGreeting()}</p>
         <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Dr. {lastName}</h1>
         <div className="mt-3 flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-2.5">
@@ -116,13 +123,12 @@ export default function DashboardPage() {
         </div>
       ) : displayStats ? (
         <>
-          <div className="grid grid-cols-4 gap-2 lg:gap-4">
-            <StatsWidget icon={Building2} value={displayOrgs.length} label="Vet Clinics" badge={pendingOrgsCount || undefined} onClick={() => navigate('/organizations')} />
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-4">
             <StatsWidget icon={Users} value={displayStats.clients.total} label="Clients" onClick={() => navigate('/dashboard/clients')} />
             <StatsWidget icon={PawPrint} value={displayStats.animals.byPatientType.SINGLE_PET} label="Pets" onClick={() => navigate('/dashboard/animals?type=pet')} />
             <StatsWidget icon={Tractor} value={displayStats.animals.byPatientType.SINGLE_LIVESTOCK + displayStats.animals.byPatientType.BATCH_LIVESTOCK} label="Livestocks" onClick={() => navigate('/dashboard/animals?type=livestock')} />
           </div>
-          <div className="grid grid-cols-3 gap-2 lg:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-4">
             <StatsWidget icon={DollarSign} value={`₦${(displayStats.revenue.total / 1000).toFixed(0)}k`} label="Revenue" onClick={() => navigate('/dashboard/revenue')} />
             <StatsWidget icon={ClipboardList} value={displayStats.revenue.unpaidInvoices} label="Pending payments" variant="warning" onClick={() => navigate('/dashboard/revenue?status=owed')} />
             <StatsWidget icon={CalendarDays} value={displayStats.treatments.scheduled} label="Upcoming appointments" badge={displayStats.treatments.scheduled} onClick={() => navigate('/dashboard/schedule')} />
@@ -185,7 +191,7 @@ export default function DashboardPage() {
           <ul className="space-y-1.5">
             <li className="flex items-center gap-2 text-sm text-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              <span><strong>{displayStats.treatments.followUpsDue}</strong> follow-ups today</span>
+              <span><strong>{followUpsList.length}</strong> follow-ups today</span>
             </li>
             <li className="flex items-center gap-2 text-sm text-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -203,7 +209,7 @@ export default function DashboardPage() {
 
       {/* Add New prompt */}
       <div className="text-center text-sm text-muted-foreground pb-2">
-        Want to add a new vet clinic, client, revenue, pending payment, pet, or livestock?
+        Add a client, payment, pet, livestock, or appointment from the button below.
       </div>
 
       {/* Add New Button (mobile) */}
@@ -224,7 +230,7 @@ export default function DashboardPage() {
         <Plus className="w-6 h-6" />
       </button>
 
-      <AddNewDialog open={addOpen} onOpenChange={setAddOpen} showVetClinic />
+      <AddNewDialog open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }

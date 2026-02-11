@@ -29,7 +29,19 @@ const PAYMENT_STATUS_OPTIONS = [
   { label: 'Paid', value: 'PAID' },
   { label: 'Pending', value: 'OWED' },
   { label: 'Partial', value: 'PARTIAL' },
+  { label: 'Partially Paid', value: 'PARTIALLY_PAID' },
+  { label: 'Waived', value: 'WAIVED' },
 ] as const;
+
+type PaymentStatusValue = (typeof PAYMENT_STATUS_OPTIONS)[number]['value'];
+
+function normalizePaymentStatus(
+  value: string | undefined
+): PaymentStatusValue {
+  if (value === 'PAID' || value === 'OWED' || value === 'PARTIAL' || value === 'PARTIALLY_PAID' || value === 'WAIVED')
+    return value as PaymentStatusValue;
+  return 'OWED';
+}
 
 interface EditTreatmentDialogProps {
   open: boolean;
@@ -54,16 +66,17 @@ export function EditTreatmentDialog({
   onSuccess,
 }: EditTreatmentDialogProps) {
   const formId = useId();
-  const [paymentStatus, setPaymentStatus] = useState<'PAID' | 'OWED' | 'PARTIAL'>('OWED');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusValue>('OWED');
   const { toast } = useToast();
   const { currentOrgId } = useCurrentOrg();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (treatment) {
-      setPaymentStatus(treatment.paymentStatus);
+      const raw = (treatment as { paymentStatus?: string }).paymentStatus;
+      setPaymentStatus(normalizePaymentStatus(raw));
     }
-  }, [treatment]);
+  }, [treatment?.id, (treatment as { paymentStatus?: string })?.paymentStatus]);
 
   const updateMutation = useMutation({
     mutationFn: (data: {
@@ -72,13 +85,15 @@ export function EditTreatmentDialog({
       chiefComplaint?: string;
       treatmentGiven?: string;
       amount?: number;
-      paymentStatus: 'PAID' | 'OWED' | 'PARTIAL';
+      paymentStatus: string;
       followUpDate?: string;
       notes?: string;
       status?: string;
     }) => {
+      const backendPaymentStatus =
+        data.paymentStatus === 'PARTIAL' ? 'PARTIALLY_PAID' : data.paymentStatus;
       const payload: Record<string, unknown> = {
-        paymentStatus: data.paymentStatus,
+        paymentStatus: backendPaymentStatus,
         notes: data.notes,
       };
       if (data.visitDate) {
@@ -165,7 +180,7 @@ export function EditTreatmentDialog({
             Update treatment details for {treatment.animal?.name ?? 'patient'}.
           </DialogDescription>
         </DialogHeader>
-        <form id={formId} onSubmit={handleSubmit} className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
+        <form id={formId} onSubmit={handleSubmit} className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1" key={treatment.id}>
           <div className="space-y-1.5">
             <Label htmlFor={formId + '-visitDate'}>Visit Date *</Label>
             <Input
@@ -209,14 +224,17 @@ export function EditTreatmentDialog({
                 min={0}
                 step={1}
                 placeholder="0"
-                defaultValue={treatment.amount ?? ''}
+                defaultValue={treatment.amount != null ? treatment.amount : ''}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={formId + '-paymentStatus'}>Payment Status</Label>
-              <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as 'PAID' | 'OWED' | 'PARTIAL')}>
+              <Select
+                value={paymentStatus ?? 'OWED'}
+                onValueChange={(v) => setPaymentStatus(v as PaymentStatusValue)}
+              >
                 <SelectTrigger id={formId + '-paymentStatus'}>
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   {PAYMENT_STATUS_OPTIONS.map((o) => (

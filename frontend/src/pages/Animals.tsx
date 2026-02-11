@@ -38,6 +38,15 @@ export default function AnimalsPage() {
     queryFn: () => api.getDashboardStats(currentOrgId!),
     enabled: !!currentOrgId,
   });
+  const { data: followUpsData } = useQuery({
+    queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
+    queryFn: () => api.getFollowUpsToday(currentOrgId!),
+    enabled: !!currentOrgId,
+  });
+  const followUpsCount =
+    (followUpsData as { treatments?: unknown[] })?.treatments?.length ??
+    (followUpsData as { count?: number })?.count ??
+    0;
   const { data: animalsRes, isLoading, isError } = useQuery({
     queryKey: queryKeys.animals.list(currentOrgId!, { page, search, species: activeTab }),
     queryFn: () =>
@@ -221,7 +230,7 @@ export default function AnimalsPage() {
           </li>
           <li className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <strong>{dashboardStats?.treatments?.followUpsDue ?? 0}</strong> follow-ups today
+            <strong>{followUpsCount}</strong> follow-ups today
           </li>
         </ul>
       </div>

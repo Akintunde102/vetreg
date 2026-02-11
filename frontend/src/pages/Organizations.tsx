@@ -276,12 +276,25 @@ export default function OrganizationsPage() {
                 </span>
               </div>
 
-              <button
-                onClick={() => handleSwitchOrg(org.id)}
-                className="mt-3 w-full py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg hover:bg-accent transition-colors flex items-center justify-center gap-1"
-              >
-                Switch & open dashboard <ArrowRight className="w-3 h-3" />
-              </button>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => handleSwitchOrg(org.id)}
+                  className="flex-1 py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg hover:bg-accent transition-colors flex items-center justify-center gap-1"
+                >
+                  Switch & open dashboard <ArrowRight className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentOrgId(org.id);
+                    queryClient.invalidateQueries();
+                    navigate('/dashboard/clinic-settings');
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+                  title="Customize clinic"
+                >
+                  Customize
+                </button>
+              </div>
             </div>
           ))}
         </div>

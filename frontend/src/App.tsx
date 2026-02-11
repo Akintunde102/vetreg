@@ -29,6 +29,8 @@ import SchedulePage from "@/pages/Schedule";
 import TreatmentsPage from "@/pages/Treatments";
 import TreatmentDetailPage from "@/pages/TreatmentDetail";
 import SettingsPage from "@/pages/Settings";
+import ClinicSettingsPage from "@/pages/ClinicSettings";
+import MembersPage from "@/pages/Members";
 import ReportsPage from "@/pages/Reports";
 import MorePage from "@/pages/More";
 import NotificationsPage from "@/pages/Notifications";
@@ -86,6 +88,8 @@ const App = () => (
                       <Route path="/dashboard/payments" element={<PaymentsPage />} />
                       <Route path="/organizations" element={<OrganizationsPage />} />
                       <Route path="/dashboard/settings" element={<SettingsPage />} />
+                      <Route path="/dashboard/clinic-settings" element={<ClinicSettingsPage />} />
+                      <Route path="/dashboard/members" element={<MembersPage />} />
                       <Route path="/dashboard/reports" element={<ReportsPage />} />
                       <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
                       <Route path="/notifications" element={<NotificationsPage />} />

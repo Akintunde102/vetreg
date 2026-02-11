@@ -1,16 +1,29 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Calendar, Search, AlertCircle, ArrowRight, Filter, ArrowUpDown, Plus } from 'lucide-react';
+import { DollarSign, Calendar, Search, AlertCircle, ArrowRight, ArrowUpDown, Plus, User, Phone, Mail, Stethoscope, PawPrint, ExternalLink } from 'lucide-react';
 import { format, parseISO, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AddNewDialog } from '@/components/AddNewDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
+import type { Treatment } from '@/types/api';
+
+function clientName(t: Treatment): string {
+  const c = t.animal?.client;
+  if (!c) return '—';
+  return [c.firstName, c.lastName].filter(Boolean).join(' ') || '—';
+}
 
 
 const categoryTabs = [
@@ -33,41 +46,46 @@ export default function RevenuePage() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('date-desc');
   const [addOpen, setAddOpen] = useState(false);
+  const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
   const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentOrgId } = useCurrentOrg();
   const queryClient = useQueryClient();
 
+  const fromDateStr = dateRange.from.toISOString().split('T')[0];
+  const toDateStr = dateRange.to.toISOString().split('T')[0];
+
   const { data: revenueData, isError: revenueError } = useQuery({
-    queryKey: queryKeys.orgs.revenue(currentOrgId!, {
-      fromDate: dateRange.from.toISOString().split('T')[0],
-      toDate: dateRange.to.toISOString().split('T')[0],
-    }),
+    queryKey: queryKeys.orgs.revenue(currentOrgId!, { fromDate: fromDateStr, toDate: toDateStr }),
     queryFn: () =>
       api.getRevenue(currentOrgId!, {
-        fromDate: dateRange.from.toISOString().split('T')[0],
-        toDate: dateRange.to.toISOString().split('T')[0],
+        fromDate: fromDateStr,
+        toDate: toDateStr,
       }),
     enabled: !!currentOrgId,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: followUpsData } = useQuery({
     queryKey: queryKeys.dashboard.followUpsToday(currentOrgId!),
     queryFn: () => api.getFollowUpsToday(currentOrgId!),
     enabled: !!currentOrgId,
+    refetchInterval: 60_000,
   });
-  const followUpsCount = (followUpsData as { count?: number })?.count ?? 0;
+  const followUpsCount =
+    (followUpsData as { treatments?: unknown[]; count?: number } | undefined)?.treatments?.length ??
+    (followUpsData as { count?: number })?.count ??
+    0;
 
   const { data: treatmentsRes } = useQuery({
-    queryKey: ['treatments', currentOrgId, activeStatus, activeCategory],
+    queryKey: ['treatments', currentOrgId, 'revenue-preload'],
     queryFn: () =>
-      api.getTreatments(currentOrgId!, {
-        paymentStatus: activeStatus === 'ALL' ? undefined : activeStatus,
-        paymentCategory: activeCategory === 'ALL' ? undefined : activeCategory,
-        limit: '100',
-      }),
+      api.getTreatments(currentOrgId!, { limit: '500' }),
     enabled: !!currentOrgId,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const mapRevenue = (data: unknown) => {
@@ -92,8 +110,22 @@ export default function RevenuePage() {
   const fromStr = format(dateRange.from, 'yyyy-MM-dd');
   const toStr = format(dateRange.to, 'yyyy-MM-dd');
 
+  const categoryToPatientType: Record<string, string | undefined> = {
+    PET: 'SINGLE_PET',
+    LIVESTOCK: 'SINGLE_LIVESTOCK',
+    FARM: 'BATCH_LIVESTOCK',
+  };
+  const filterByCategory = (t: Treatment) => {
+    if (activeCategory === 'ALL') return true;
+    const pt = categoryToPatientType[activeCategory];
+    return pt ? t.animal?.patientType === pt : true;
+  };
+  const filterByStatus = (t: Treatment) =>
+    activeStatus === 'ALL' || t.paymentStatus === activeStatus;
+
   const filtered = treatmentsRaw
     .filter((t) => {
+      if (!filterByStatus(t) || !filterByCategory(t)) return false;
       const visitStr = t.visitDate?.slice(0, 10) ?? '';
       const inDateRange = visitStr >= fromStr && visitStr <= toStr;
       const matchesSearch =
@@ -273,7 +305,17 @@ export default function RevenuePage() {
 
       <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
         {filtered.map((t) => (
-          <div key={t.id} className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-all">
+          <div
+            key={t.id}
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('button')) return;
+              setSelectedTreatment(t);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && setSelectedTreatment(t)}
+            className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer"
+          >
             <div className="flex gap-3">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-lg flex-shrink-0">
                 {t.animal?.species === 'Dog' ? '🐕' : t.animal?.species === 'Cat' ? '🐈' : '🐄'}
@@ -281,6 +323,7 @@ export default function RevenuePage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div>
+                    <p className="text-xs text-muted-foreground font-medium">{clientName(t)}</p>
                     <h3 className="font-bold text-foreground">
                       {t.animal?.patientType === 'BATCH_LIVESTOCK' ? `Batch ${t.animal?.batchIdentifier}` : t.animal?.name}
                     </h3>
@@ -315,13 +358,14 @@ export default function RevenuePage() {
               </div>
               {t.paymentStatus === 'OWED' && (
                 <button
-                  onClick={() =>
+                  onClick={(e) => {
+                    e.stopPropagation();
                     markPaymentMutation.mutate({
                       treatmentId: t.id,
                       amount: t.amount || 0,
                       paymentNotes: 'Cash',
-                    })
-                  }
+                    });
+                  }}
                   className="text-xs font-medium text-primary border border-primary/30 px-3 py-1 rounded-lg hover:bg-primary/5"
                 >
                   Mark Paid
@@ -331,6 +375,102 @@ export default function RevenuePage() {
           </div>
         ))}
       </div>
+
+      {/* Payment detail modal */}
+      <Dialog open={!!selectedTreatment} onOpenChange={(open) => !open && setSelectedTreatment(null)}>
+        <DialogContent className="max-w-md sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payment details</DialogTitle>
+          </DialogHeader>
+          {selectedTreatment && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" /> Client
+                </p>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clientId = selectedTreatment.animal?.client?.id;
+                        if (clientId) {
+                          setSelectedTreatment(null);
+                          navigate(`/dashboard/clients/${clientId}`);
+                        }
+                      }}
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      {clientName(selectedTreatment)}
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </p>
+                  {selectedTreatment.animal?.client?.phoneNumber && (
+                    <a
+                      href={`tel:${selectedTreatment.animal.client.phoneNumber}`}
+                      className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1.5"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      {selectedTreatment.animal.client.phoneNumber}
+                    </a>
+                  )}
+                  {selectedTreatment.animal?.client?.email && (
+                    <a
+                      href={`mailto:${selectedTreatment.animal.client.email}`}
+                      className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1.5 block"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      {selectedTreatment.animal.client.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Stethoscope className="w-3.5 h-3.5" /> Treatment
+                </p>
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium text-foreground">{selectedTreatment.diagnosis ?? '—'}</p>
+                  <p className="text-muted-foreground">
+                    {format(parseISO(selectedTreatment.visitDate), 'MMM dd, yyyy')} · ₦{(selectedTreatment.amount ?? 0).toLocaleString()}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTreatment(null);
+                      navigate(`/dashboard/treatments/${selectedTreatment.id}`);
+                    }}
+                    className="text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    View full treatment
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <PawPrint className="w-3.5 h-3.5" /> Patient
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedTreatment.animal?.id) {
+                      setSelectedTreatment(null);
+                      navigate(`/dashboard/animals/${selectedTreatment.animal.id}`);
+                    }
+                  }}
+                  className="text-primary hover:underline inline-flex items-center gap-1 font-medium"
+                >
+                  {selectedTreatment.animal?.patientType === 'BATCH_LIVESTOCK'
+                    ? `Batch ${selectedTreatment.animal?.batchIdentifier ?? ''}`
+                    : selectedTreatment.animal?.name ?? '—'}
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">

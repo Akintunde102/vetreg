@@ -220,22 +220,28 @@ export class OrganizationsService {
       });
     }
 
+    const raw: Record<string, unknown> = {
+      name: dto.name,
+      description: dto.description,
+      address: dto.address,
+      city: dto.city,
+      state: dto.state,
+      country: dto.country,
+      phoneNumber: dto.phoneNumber,
+      email: dto.email,
+      website: dto.website,
+      type: dto.type,
+      isActive: dto.isActive,
+      paymentTerms: dto.paymentTerms,
+      welcomeMessage: dto.welcomeMessage,
+      settings: dto.settings,
+    };
+    const data = Object.fromEntries(
+      Object.entries(raw).filter(([, v]) => v !== undefined),
+    ) as Parameters<typeof this.prisma.organization.update>[0]['data'];
     const updatedOrg = await this.prisma.organization.update({
       where: { id: orgId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        address: dto.address,
-        city: dto.city,
-        state: dto.state,
-        country: dto.country,
-        phoneNumber: dto.phoneNumber,
-        email: dto.email,
-        website: dto.website,
-        type: dto.type,
-        isActive: dto.isActive,
-        paymentTerms: dto.paymentTerms,
-      },
+      data,
     });
 
     await this.auditLogService.log({

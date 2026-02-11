@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
   ParseBoolPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TreatmentsService } from './treatments.service';
@@ -99,6 +100,23 @@ export class TreatmentsController {
   @SkipResponseTransform()
   async getFollowUpsToday(@Param('orgId') orgId: string) {
     return this.treatmentsService.getFollowUpsToday(orgId);
+  }
+
+  @Get('follow-ups')
+  @SkipResponseTransform()
+  async getFollowUpsInRange(
+    @Param('orgId') orgId: string,
+    @Query('from') fromDate?: string,
+    @Query('to') toDate?: string,
+  ) {
+    if (!fromDate || !toDate) {
+      throw new BadRequestException('Query params "from" and "to" (yyyy-MM-dd) are required');
+    }
+    return this.treatmentsService.getFollowUpsInRange(
+      orgId,
+      fromDate,
+      toDate,
+    );
   }
 
   @Get(':treatmentId')

@@ -1,4 +1,4 @@
-import { useState, useId } from 'react';
+import { useState, useId, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ interface AddNewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultType?: FormType;
+  /** When opening for "Add Animal", pre-select this client. */
+  defaultClientId?: string;
   showVetClinic?: boolean;
 }
 
@@ -36,7 +38,7 @@ const SPECIES_OPTIONS = [
   { label: 'Other', value: 'OTHER' },
 ];
 
-export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', showVetClinic = false }: AddNewDialogProps) {
+export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', defaultClientId, showVetClinic = false }: AddNewDialogProps) {
   const quickOptions = showVetClinic
     ? [{ label: 'Add Vet Clinic', value: 'org' as FormType, emoji: '🏥' }, ...baseQuickOptions]
     : baseQuickOptions;
@@ -51,15 +53,27 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', showVe
   const [selectTreatmentAnimalId, setSelectTreatmentAnimalId] = useState('');
   const [treatmentPaymentStatus, setTreatmentPaymentStatus] = useState<'PAID' | 'OWED' | 'PARTIAL'>('OWED');
   const [selectPatientType, setSelectPatientType] = useState<'SINGLE_PET' | 'SINGLE_LIVESTOCK' | 'BATCH_LIVESTOCK'>('SINGLE_PET');
+  const [selectBreed, setSelectBreed] = useState('');
   const { toast } = useToast();
   const { currentOrgId } = useCurrentOrg();
   const queryClient = useQueryClient();
   const formId = useId();
 
   const handleOpen = (isOpen: boolean) => {
-    if (!isOpen) setFormType(defaultType);
+    if (!isOpen) {
+      setFormType(defaultType);
+      if (defaultClientId) setSelectClientId('');
+      setSelectBreed('');
+    }
     onOpenChange(isOpen);
   };
+
+  useEffect(() => {
+    if (open && defaultClientId && (formType === 'animal' || defaultType === 'animal')) {
+      setSelectClientId(defaultClientId);
+      if (formType !== 'animal') setFormType('animal');
+    }
+  }, [open, defaultClientId, defaultType, formType]);
 
   const getVal = (form: HTMLFormElement, id: string) =>
     (form.querySelector(`[id="${id}"]`) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)?.value?.trim() ?? '';
@@ -98,9 +112,12 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', showVe
           batchIdentifier: data.batchIdentifier,
         }),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['animals', currentOrgId!] });
       queryClient.invalidateQueries({ queryKey: queryKeys.orgs.all });
+      if (variables.clientId) {
+        queryClient.invalidateQueries({ queryKey: ['clients', currentOrgId!, variables.clientId, 'animals'] });
+      }
       toast({ title: 'Animal registered' });
       handleOpen(false);
     },
@@ -228,7 +245,7 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', showVe
         clientId: selectClientId,
         name: selectPatientType === 'BATCH_LIVESTOCK' ? (batchName || name) : name,
         species: selectSpecies || 'OTHER',
-        breed: getVal(form, formId + '-breed') || undefined,
+        breed: selectBreed?.trim() || undefined,
         gender: selectGender || undefined,
         dateOfBirth: getVal(form, formId + '-dob') || undefined,
         patientType: selectPatientType,
@@ -383,6 +400,8 @@ export function AddNewDialog({ open, onOpenChange, defaultType = 'quick', showVe
               onGenderChange={setSelectGender}
               patientType={selectPatientType}
               onPatientTypeChange={setSelectPatientType}
+              breed={selectBreed}
+              onBreedChange={setSelectBreed}
             />
           )}
 
@@ -461,6 +480,8 @@ const PATIENT_TYPE_OPTIONS = [
   { label: 'Batch Livestock', value: 'BATCH_LIVESTOCK' },
 ] as const;
 
+const COMMON_BREEDS = ['Labrador', 'German Shepherd', 'Persian', 'Siamese', 'Rottweiler', 'Mixed', 'Crossbreed'];
+
 function AnimalFormFields({
   formId,
   currentOrgId,
@@ -472,6 +493,8 @@ function AnimalFormFields({
   onGenderChange,
   patientType,
   onPatientTypeChange,
+  breed,
+  onBreedChange,
 }: {
   formId: string;
   currentOrgId: string | null;
@@ -483,6 +506,8 @@ function AnimalFormFields({
   onGenderChange: (v: string) => void;
   patientType: 'SINGLE_PET' | 'SINGLE_LIVESTOCK' | 'BATCH_LIVESTOCK';
   onPatientTypeChange: (v: 'SINGLE_PET' | 'SINGLE_LIVESTOCK' | 'BATCH_LIVESTOCK') => void;
+  breed: string;
+  onBreedChange: (v: string) => void;
 }) {
   const { data: clientsData } = useQuery({
     queryKey: queryKeys.clients.list(currentOrgId!, {}),
@@ -554,8 +579,30 @@ function AnimalFormFields({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={formId + '-breed'}>Breed</Label>
-          <Input id={formId + '-breed'} name="breed" placeholder="e.g. Labrador" />
+          <Label htmlFor={formId + '-breed'}>Breed (optional)</Label>
+          <Input
+            id={formId + '-breed'}
+            name="breed"
+            value={breed}
+            onChange={(e) => onBreedChange(e.target.value)}
+            placeholder="Type any breed name"
+          />
+          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-1">
+            <span>Quick:</span>
+            {COMMON_BREEDS.map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => onBreedChange(breed === b ? '' : b)}
+                className={cn(
+                  'px-2 py-0.5 rounded-md text-xs font-medium transition-colors',
+                  breed === b ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80 text-foreground'
+                )}
+              >
+                {b}
+              </button>
+            ))}
+          </p>
         </div>
       </div>
       {!isBatch && (

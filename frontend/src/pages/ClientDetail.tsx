@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Mail, PawPrint, Calendar, DollarSign, Clock, MessageSquare, Trash2 } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, PawPrint, Calendar, DollarSign, Clock, MessageSquare, Trash2, Plus } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
 import { useToast } from '@/hooks/use-toast';
+import { AddNewDialog } from '@/components/AddNewDialog';
 import { ReasonModal } from '@/components/admin/ReasonModal';
 import { SmsMessageDialog } from '@/components/SmsMessageDialog';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export default function ClientDetailPage() {
   const { currentOrgId, currentOrg } = useCurrentOrg();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
+  const [addAnimalOpen, setAddAnimalOpen] = useState(false);
 
   const { data: clientData, isLoading, isError } = useQuery({
     queryKey: queryKeys.clients.detail(currentOrgId!, clientId!),
@@ -155,18 +157,26 @@ export default function ClientDetailPage() {
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-5 lg:space-y-0">
         {/* Animals */}
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <PawPrint className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold text-foreground">Animals</h2>
-            <span className="w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
-              {animals.length}
-            </span>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <PawPrint className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold text-foreground">Animals</h2>
+              <span className="w-6 h-6 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
+                {animals.length}
+              </span>
+            </div>
+            <Button size="sm" className="gap-1.5" onClick={() => setAddAnimalOpen(true)}>
+              <Plus className="w-4 h-4" /> Add Animal
+            </Button>
           </div>
 
           {animals.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground bg-card rounded-xl border border-border">
               <PawPrint className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No animals registered</p>
+              <Button size="sm" variant="outline" className="mt-3 gap-1.5" onClick={() => setAddAnimalOpen(true)}>
+                <Plus className="w-4 h-4" /> Add Animal
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -289,6 +299,12 @@ export default function ClientDetailPage() {
         orgName={currentOrg?.name ?? 'Our clinic'}
         phoneNumber={client.phoneNumber}
         balance={balance}
+      />
+      <AddNewDialog
+        open={addAnimalOpen}
+        onOpenChange={setAddAnimalOpen}
+        defaultType="animal"
+        defaultClientId={clientId ?? undefined}
       />
       <ReasonModal
         open={deleteOpen}

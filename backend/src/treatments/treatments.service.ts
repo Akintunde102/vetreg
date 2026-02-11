@@ -178,6 +178,8 @@ export class TreatmentsService {
                   id: true,
                   firstName: true,
                   lastName: true,
+                  phoneNumber: true,
+                  email: true,
                 },
               },
             },
@@ -223,6 +225,7 @@ export class TreatmentsService {
                 firstName: true,
                 lastName: true,
                 phoneNumber: true,
+                email: true,
               },
             },
           },
@@ -707,6 +710,52 @@ export class TreatmentsService {
         followUpDate: {
           gte: startOfDay,
           lte: endOfDay,
+        },
+      },
+      include: {
+        animal: {
+          select: {
+            id: true,
+            name: true,
+            species: true,
+            photoUrl: true,
+            client: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { followUpDate: 'asc' },
+    });
+
+    return {
+      treatments,
+      count: treatments.length,
+    };
+  }
+
+  async getFollowUpsInRange(
+    organizationId: string,
+    fromDate: string,
+    toDate: string,
+  ) {
+    const from = new Date(fromDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+
+    const treatments = await this.prisma.treatmentRecord.findMany({
+      where: {
+        organizationId,
+        isDeleted: false,
+        followUpDate: {
+          gte: from,
+          lte: to,
         },
       },
       include: {

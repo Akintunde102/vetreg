@@ -3,6 +3,8 @@ import type {
   Organization,
   PendingOrganization,
   Invitation,
+  OrgMember,
+  MembershipRole,
   Animal,
   Client,
   Treatment,
@@ -98,7 +100,43 @@ class ApiClient {
 
   async getOrganization(orgId: string): Promise<Organization> {
     const res = await this.request<{ data: Organization }>(`/orgs/${orgId}`);
-    return res.data;
+    return 'data' in res ? res.data : (res as unknown as Organization);
+  }
+
+  async updateOrganization(
+    orgId: string,
+    data: Partial<Pick<Organization, 'name' | 'description' | 'address' | 'city' | 'state' | 'country' | 'phoneNumber' | 'email' | 'website' | 'paymentTerms' | 'welcomeMessage' | 'settings'>>,
+  ): Promise<Organization> {
+    const res = await this.request<{ data: Organization }>(`/orgs/${orgId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return 'data' in res ? res.data : (res as unknown as Organization);
+  }
+
+  async getMembers(orgId: string): Promise<OrgMember[]> {
+    const res = await this.request<{ data: OrgMember[] } | OrgMember[]>(`/orgs/${orgId}/members`);
+    return Array.isArray(res) ? res : (res.data ?? []);
+  }
+
+  async updateMemberRole(orgId: string, membershipId: string, dto: { role: MembershipRole }): Promise<OrgMember> {
+    const res = await this.request<{ data: OrgMember } | OrgMember>(`/orgs/${orgId}/members/${membershipId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    });
+    return 'data' in res ? res.data : (res as OrgMember);
+  }
+
+  async updateMemberPermissions(
+    orgId: string,
+    membershipId: string,
+    dto: { canDeleteClients?: boolean; canDeleteAnimals?: boolean; canDeleteTreatments?: boolean; canViewActivityLog?: boolean },
+  ): Promise<OrgMember> {
+    const res = await this.request<{ data: OrgMember } | OrgMember>(`/orgs/${orgId}/members/${membershipId}/permissions`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    });
+    return 'data' in res ? res.data : (res as OrgMember);
   }
 
   async getInvitations(orgId: string): Promise<Invitation[]> {
@@ -142,6 +180,17 @@ class ApiClient {
 
   async getFollowUpsToday(orgId: string) {
     return this.request<{ treatments: Treatment[]; count: number }>(`/orgs/${orgId}/treatments/follow-ups/today`);
+  }
+
+  async getFollowUpsInRange(
+    orgId: string,
+    from: string,
+    to: string,
+  ): Promise<{ treatments: Treatment[]; count: number }> {
+    const params = new URLSearchParams({ from, to });
+    return this.request<{ treatments: Treatment[]; count: number }>(
+      `/orgs/${orgId}/treatments/follow-ups?${params}`,
+    );
   }
 
   // Animals

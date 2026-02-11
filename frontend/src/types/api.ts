@@ -30,13 +30,19 @@ export interface VetProfile {
 export interface Organization {
   id: string;
   name: string;
+  description?: string;
   address: string;
   city: string;
   state?: string;
   country?: string;
+  phoneNumber?: string;
+  email?: string;
+  website?: string;
   logoUrl?: string;
   status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   paymentTerms?: string;
+  welcomeMessage?: string;
+  settings?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   _counts?: {
@@ -64,6 +70,19 @@ export interface PendingOrganization extends Organization {
 }
 
 export type MembershipRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+export interface OrgMember {
+  id: string;
+  vet: { id: string; fullName: string; email: string; phoneNumber?: string; profilePhotoUrl?: string; specialization?: string };
+  role: MembershipRole;
+  joinedAt: string;
+  permissions: {
+    canDeleteClients: boolean;
+    canDeleteAnimals: boolean;
+    canDeleteTreatments: boolean;
+    canViewActivityLog: boolean;
+  };
+}
 
 export interface Invitation {
   id: string;

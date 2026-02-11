@@ -20,6 +20,7 @@ const mainNav = [
 
 const orgNav = [
   { to: '/organizations', icon: Building2, label: 'Clinics' },
+  { to: '/dashboard/members', icon: Users, label: 'Members' },
   { to: '/notifications', icon: Bell, label: 'Notifications', showBadge: true },
   { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];

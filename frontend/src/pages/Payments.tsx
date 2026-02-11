@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Filter, ArrowUpDown, DollarSign, Download } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, DollarSign, Download, ExternalLink, User, Phone, Mail, Stethoscope, PawPrint } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { useCurrentOrg } from '@/hooks/useCurrentOrg';
-
+import type { Treatment } from '@/types/api';
 
 const sortOptions = [
   { label: 'Date (Newest)', value: 'date-desc' },
@@ -20,16 +27,41 @@ const sortOptions = [
   { label: 'Amount (Low)', value: 'amount-asc' },
 ];
 
+const categoryTabs = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Pet', value: 'PET' },
+  { label: 'Livestock', value: 'LIVESTOCK' },
+  { label: 'Farm', value: 'FARM' },
+];
+
+function clientName(t: Treatment): string {
+  const c = t.animal?.client;
+  if (!c) return '—';
+  return [c.firstName, c.lastName].filter(Boolean).join(' ') || '—';
+}
+
 export default function PaymentsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date-desc');
+  const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { currentOrgId } = useCurrentOrg();
 
-  const { data: treatmentsRes, isLoading, isError } = useQuery({
-    queryKey: queryKeys.treatments.list(currentOrgId!, { payments: 'all' }),
-    queryFn: () => api.getTreatments(currentOrgId!, { limit: '500' }),
+  const { data: treatmentsRes, isLoading } = useQuery({
+    queryKey: queryKeys.treatments.list(currentOrgId!, {
+      payments: 'all',
+      category: categoryFilter,
+      status: statusFilter,
+    }),
+    queryFn: () =>
+      api.getTreatments(currentOrgId!, {
+        limit: '500',
+        paymentStatus: statusFilter === 'ALL' ? undefined : statusFilter,
+        paymentCategory: categoryFilter === 'ALL' ? undefined : categoryFilter,
+      }),
     enabled: !!currentOrgId,
   });
 
@@ -37,12 +69,12 @@ export default function PaymentsPage() {
 
   const filtered = allTreatments
     .filter(t => {
-      const matchesStatus = statusFilter === 'ALL' || t.paymentStatus === statusFilter;
       const matchesSearch = search === '' ||
-        t.animal.name.toLowerCase().includes(search.toLowerCase()) ||
-        t.organization.name.toLowerCase().includes(search.toLowerCase()) ||
-        t.diagnosis?.toLowerCase().includes(search.toLowerCase());
-      return matchesStatus && matchesSearch;
+        t.animal?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        t.organization?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        t.diagnosis?.toLowerCase().includes(search.toLowerCase()) ||
+        clientName(t).toLowerCase().includes(search.toLowerCase());
+      return matchesSearch;
     })
     .sort((a, b) => {
       if (sortBy === 'date-desc') return new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime();
@@ -138,7 +170,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Status tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {['ALL', 'PAID', 'OWED'].map(s => (
           <button
             key={s}
@@ -155,10 +187,35 @@ export default function PaymentsPage() {
         ))}
       </div>
 
+      {/* Category tabs (Pet / Livestock) */}
+      <div className="flex flex-wrap gap-2">
+        {categoryTabs.map(({ label, value }) => (
+          <button
+            key={value}
+            onClick={() => setCategoryFilter(value)}
+            className={cn(
+              'px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors border',
+              categoryFilter === value
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-foreground border-border hover:border-primary/30'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Mobile card view */}
       <div className="space-y-3 lg:hidden">
         {filtered.map(t => (
-          <div key={t.id} className="bg-card border border-border rounded-xl p-4">
+          <div
+            key={t.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedTreatment(t)}
+            onKeyDown={e => e.key === 'Enter' && setSelectedTreatment(t)}
+            className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+          >
             <div className="flex gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-base flex-shrink-0">
                 {t.animal.species === 'Dog' ? '🐕' : t.animal.species === 'Cat' ? '🐈' : '🐄'}
@@ -166,6 +223,7 @@ export default function PaymentsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div>
+                    <p className="text-xs text-muted-foreground font-medium">{clientName(t)}</p>
                     <h3 className="font-bold text-sm text-foreground">
                       {t.animal.patientType === 'BATCH_LIVESTOCK' ? `Batch ${t.animal.batchIdentifier}` : t.animal.name}
                     </h3>
@@ -194,6 +252,7 @@ export default function PaymentsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Client</TableHead>
               <TableHead>Patient</TableHead>
               <TableHead>Diagnosis</TableHead>
               <TableHead>Organization</TableHead>
@@ -204,7 +263,12 @@ export default function PaymentsPage() {
           </TableHeader>
           <TableBody>
             {filtered.map(t => (
-              <TableRow key={t.id}>
+              <TableRow
+                key={t.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => setSelectedTreatment(t)}
+              >
+                <TableCell className="font-medium text-foreground">{clientName(t)}</TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     <span>{t.animal.species === 'Dog' ? '🐕' : t.animal.species === 'Cat' ? '🐈' : '🐄'}</span>
@@ -229,6 +293,105 @@ export default function PaymentsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Payment detail modal */}
+      <Dialog open={!!selectedTreatment} onOpenChange={open => !open && setSelectedTreatment(null)}>
+        <DialogContent className="max-w-md sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payment details</DialogTitle>
+          </DialogHeader>
+          {selectedTreatment && (
+            <div className="space-y-4">
+              {/* Client */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" /> Client
+                </p>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clientId = selectedTreatment.animal?.client?.id;
+                        if (clientId) {
+                          setSelectedTreatment(null);
+                          navigate(`/dashboard/clients/${clientId}`);
+                        }
+                      }}
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      {clientName(selectedTreatment)}
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </p>
+                  {selectedTreatment.animal?.client?.phoneNumber && (
+                    <a
+                      href={`tel:${selectedTreatment.animal.client.phoneNumber}`}
+                      className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1.5"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      {selectedTreatment.animal.client.phoneNumber}
+                    </a>
+                  )}
+                  {selectedTreatment.animal?.client?.email && (
+                    <a
+                      href={`mailto:${selectedTreatment.animal.client.email}`}
+                      className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1.5 block"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      {selectedTreatment.animal.client.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+              {/* Treatment */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Stethoscope className="w-3.5 h-3.5" /> Treatment
+                </p>
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium text-foreground">{selectedTreatment.diagnosis ?? '—'}</p>
+                  <p className="text-muted-foreground">
+                    {format(parseISO(selectedTreatment.visitDate), 'MMM dd, yyyy')} · ₦{(selectedTreatment.amount ?? 0).toLocaleString()}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTreatment(null);
+                      navigate(`/dashboard/treatments/${selectedTreatment.id}`);
+                    }}
+                    className="text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    View full treatment
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              {/* Animal */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <PawPrint className="w-3.5 h-3.5" /> Patient
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedTreatment.animal?.id) {
+                      setSelectedTreatment(null);
+                      navigate(`/dashboard/animals/${selectedTreatment.animal.id}`);
+                    }
+                  }}
+                  className="text-primary hover:underline inline-flex items-center gap-1 font-medium"
+                >
+                  {selectedTreatment.animal?.patientType === 'BATCH_LIVESTOCK'
+                    ? `Batch ${selectedTreatment.animal?.batchIdentifier ?? ''}`
+                    : selectedTreatment.animal?.name ?? '—'}
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {isLoading && (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>

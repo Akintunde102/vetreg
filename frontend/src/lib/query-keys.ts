@@ -27,6 +27,8 @@ export const queryKeys = {
     scheduledList: (orgId: string, from?: string, to?: string) =>
       ['treatments', orgId, 'scheduled-list', from ?? '', to ?? ''] as const,
     followUps: (orgId: string) => ['treatments', orgId, 'follow-ups'] as const,
+    followUpsInRange: (orgId: string, from: string, to: string) =>
+      ['treatments', orgId, 'follow-ups-range', from, to] as const,
   },
   dashboard: {
     stats: (orgId: string) => ['dashboard', 'stats', orgId] as const,

@@ -242,6 +242,10 @@ model Organization {
   isActive     Boolean @default(true) @map("is_active")
   paymentTerms String? @map("payment_terms")
 
+  // Clinic customization
+  welcomeMessage String? @map("welcome_message") @db.Text
+  settings       Json?   @map("settings")
+
   // Approval workflow
   status           OrgStatus @default(PENDING_APPROVAL)
   approvedAt       DateTime? @map("approved_at")
